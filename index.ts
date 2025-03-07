@@ -26,6 +26,7 @@ const logger = pino({
   timestamp: pino.stdTimeFunctions.isoTime,
 });
 
+
 // Configuration
 interface Config {
   apiKey: string;
@@ -65,6 +66,14 @@ interface ShipmentItem {
   tracking_number?: string;
 }
 
+interface Address {
+  line1: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
+}
+
 interface StateSetResponse {
   id: string;
   status: string;
@@ -72,6 +81,133 @@ interface StateSetResponse {
   updated_at: string;
   url: string;
   [key: string]: any;
+}
+
+interface BillOfMaterialsItem {
+  item_id: string;
+  quantity: number;
+  price: number;
+}
+
+interface WorkOrderItem {
+  item_id: string;
+  quantity: number;
+}
+
+interface ManufacturerOrderItem {
+  item_id: string;
+  quantity: number;
+}
+
+interface InvoiceItem {
+  item_id: string;
+  quantity: number;
+}   
+
+interface PaymentItem {
+  item_id: string;
+  quantity: number;
+}
+
+
+interface CreateRMAArgs {
+  order_id: string;
+  customer_email: string;
+  items: RMAItem[];
+  notes?: string;
+}
+
+interface UpdateRMAArgs {
+  rma_id: string;
+  status?: string;
+  notes?: string;
+}   
+
+interface CreateOrderArgs {
+  customer_email: string;
+  items: OrderItem[];
+  shipping_address: Address;
+  billing_address?: Address;
+}
+
+interface CreateWarrantyArgs {
+  order_id: string;
+  customer_email: string;
+  items: WarrantyItem[];
+  notes?: string;
+}
+
+interface CreateShipmentArgs {
+  order_id: string;
+  customer_email: string;
+  items: ShipmentItem[];
+  carrier: string;
+  destination_address: Address;
+}
+
+interface CreateBillOfMaterialsArgs {
+  order_id: string;
+  customer_email: string;
+  items: BillOfMaterialsItem[];
+  notes?: string;
+}
+
+interface UpdateBillOfMaterialsArgs {
+  bill_of_materials_id: string;
+  items: BillOfMaterialsItem[];
+  notes?: string;
+}
+
+interface CreateWorkOrderArgs {
+  order_id: string;
+  customer_email: string;
+  items: WorkOrderItem[];
+  notes?: string;
+}
+
+interface UpdateWorkOrderArgs {
+  work_order_id: string;
+  items: WorkOrderItem[];       
+  notes?: string;
+}
+
+interface CreateManufacturerOrderArgs {
+  order_id: string;
+  customer_email: string;
+  items: ManufacturerOrderItem[];
+  notes?: string;
+}
+
+interface UpdateManufacturerOrderArgs {
+  manufacturer_order_id: string;
+  items: ManufacturerOrderItem[];   
+  notes?: string;
+}
+
+interface CreateInvoiceArgs {
+  order_id: string;
+  customer_email: string;
+  items: InvoiceItem[];
+  notes?: string;
+}
+
+interface UpdateInvoiceArgs {
+  invoice_id: string;
+  items: InvoiceItem[];     
+  notes?: string;
+}
+
+interface CreatePaymentArgs {
+  order_id: string;
+  customer_email: string;
+  items: PaymentItem[];
+  notes?: string;
+}
+
+interface UpdatePaymentArgs {
+  payment_id: string;
+  items: PaymentItem[];
+  notes?: string;
 }
 
 // Rate Limiter
@@ -190,10 +326,9 @@ class StateSetMCPClient {
     };
   }
 
-  async createRMA(args: z.infer<typeof CreateRMAArgsSchema>): Promise<StateSetResponse> {
-    const validatedArgs = CreateRMAArgsSchema.parse(args);
+  async createRMA(args: CreateRMAArgs): Promise<StateSetResponse> {
     const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.post('/rmas', validatedArgs),
+      () => this.apiClient.post('/rmas', args),
       'createRMA'
     );
     const rma = response.data;
@@ -208,10 +343,9 @@ class StateSetMCPClient {
     });
   }
 
-  async updateRMA(args: z.infer<typeof UpdateRMAArgsSchema>): Promise<StateSetResponse> {
-    const validatedArgs = UpdateRMAArgsSchema.parse(args);
+  async updateRMA(args: UpdateRMAArgs): Promise<StateSetResponse> {
     const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.patch(`/rmas/${args.rma_id}`, validatedArgs),
+      () => this.apiClient.patch(`/rmas/${args.rma_id}`, args),
       'updateRMA'
     );
     const rma = response.data;
@@ -225,10 +359,9 @@ class StateSetMCPClient {
     });
   }
 
-  async createOrder(args: z.infer<typeof CreateOrderArgsSchema>): Promise<StateSetResponse> {
-    const validatedArgs = CreateOrderArgsSchema.parse(args);
+  async createOrder(args: CreateOrderArgs): Promise<StateSetResponse> {
     const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.post('/orders', validatedArgs),
+      () => this.apiClient.post('/orders', args),
       'createOrder'
     );
     const order = response.data;
@@ -243,10 +376,9 @@ class StateSetMCPClient {
     });
   }
 
-  async createWarranty(args: z.infer<typeof CreateWarrantyArgsSchema>): Promise<StateSetResponse> {
-    const validatedArgs = CreateWarrantyArgsSchema.parse(args);
+  async createWarranty(args: CreateWarrantyArgs): Promise<StateSetResponse> {
     const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.post('/warranties', validatedArgs),
+      () => this.apiClient.post('/warranties', args),
       'createWarranty'
     );
     const warranty = response.data;
@@ -261,10 +393,9 @@ class StateSetMCPClient {
     });
   }
 
-  async createShipment(args: z.infer<typeof CreateShipmentArgsSchema>): Promise<StateSetResponse> {
-    const validatedArgs = CreateShipmentArgsSchema.parse(args);
+    async createShipment(args: CreateShipmentArgs): Promise<StateSetResponse> {
     const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.post('/shipments', validatedArgs),
+      () => this.apiClient.post('/shipments', args),
       'createShipment'
     );
     const shipment = response.data;
@@ -300,6 +431,86 @@ class StateSetMCPClient {
     const response = await this.rateLimiter.enqueue(
       () => this.apiClient.get(`/orders/${orderId}`),
       'getOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async createBillOfMaterials(args: CreateBillOfMaterialsArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.post('/bill-of-materials', args),
+      'createBillOfMaterials'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async updateBillOfMaterials(args: UpdateBillOfMaterialsArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/bill-of-materials/${args.bill_of_materials_id}`, args), 
+      'updateBillOfMaterials'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async createWorkOrder(args: CreateWorkOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.post('/work-orders', args),
+      'createWorkOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async updateWorkOrder(args: UpdateWorkOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/work-orders/${args.work_order_id}`, args),  
+      'updateWorkOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async createManufacturerOrder(args: CreateManufacturerOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.post('/manufacturer-orders', args),
+      'createManufacturerOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async updateManufacturerOrder(args: UpdateManufacturerOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/manufacturer-orders/${args.manufacturer_order_id}`, args),
+      'updateManufacturerOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async createInvoice(args: CreateInvoiceArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.post('/invoices', args),
+      'createInvoice'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async updateInvoice(args: UpdateInvoiceArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/invoices/${args.invoice_id}`, args),
+      'updateInvoice'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async createPayment(args: CreatePaymentArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.post('/payments', args),
+      'createPayment'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async updatePayment(args: UpdatePaymentArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/payments/${args.payment_id}`, args),
+      'updatePayment'
     );
     return this.enrichResponse(response.data);
   }
@@ -360,6 +571,7 @@ const CreateWarrantyArgsSchema = z.object({
 
 const CreateShipmentArgsSchema = z.object({
   order_id: z.string().min(1, "Order ID is required"),
+  customer_email: z.string().email("Invalid email format"),
   items: z.array(z.object({
     item_id: z.string().min(1, "Item ID is required"),
     quantity: z.number().positive("Quantity must be positive"),
@@ -374,6 +586,110 @@ const CreateShipmentArgsSchema = z.object({
     country: z.string().min(2, "Country is required"),
   }),
 });
+
+const CreateBillOfMaterialsArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+  customer_email: z.string().email("Invalid email format"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+    price: z.number().positive("Price must be positive"),
+  })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+const UpdateBillOfMaterialsArgsSchema = z.object({
+  bill_of_materials_id: z.string().min(1, "Bill of Materials ID is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+    price: z.number().positive("Price must be positive"),
+  })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+const CreateWorkOrderArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+  customer_email: z.string().email("Invalid email format"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+const UpdateWorkOrderArgsSchema = z.object({
+  work_order_id: z.string().min(1, "Work Order ID is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).min(1, "At least one item is required"),
+  status: z.string().optional(),
+  notes: z.string().optional(),
+}); 
+
+const CreateManufacturerOrderArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+  customer_email: z.string().email("Invalid email format"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+const UpdateManufacturerOrderArgsSchema = z.object({
+  manufacturer_order_id: z.string().min(1, "Manufacturer Order ID is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).min(1, "At least one item is required"),
+  status: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+const CreateInvoiceArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+  customer_email: z.string().email("Invalid email format"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+const UpdateInvoiceArgsSchema = z.object({
+  invoice_id: z.string().min(1, "Invoice ID is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+const CreatePaymentArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+  customer_email: z.string().email("Invalid email format"),
+  amount: z.number().positive("Amount must be positive"),   
+  payment_method: z.string().min(1, "Payment method is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+const UpdatePaymentArgsSchema = z.object({
+  payment_id: z.string().min(1, "Payment ID is required"),
+  amount: z.number().positive("Amount must be positive"),
+  payment_method: z.string().min(1, "Payment method is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
 
 // Tool Definitions
 const createRMATool: Tool = {
@@ -406,6 +722,61 @@ const createShipmentTool: Tool = {
   inputSchema: CreateShipmentArgsSchema.shape as any,
 };
 
+const createBillOfMaterialsTool: Tool = {
+  name: "stateset_create_bill_of_materials",
+  description: "Creates a bill of materials record",
+  inputSchema: CreateBillOfMaterialsArgsSchema.shape as any,
+};
+
+const updateBillOfMaterialsTool: Tool = {
+  name: "stateset_update_bill_of_materials",
+  description: "Updates a bill of materials record",
+  inputSchema: UpdateBillOfMaterialsArgsSchema.shape as any,
+};
+
+const createWorkOrderTool: Tool = {
+  name: "stateset_create_work_order",
+  description: "Creates a work order record",
+  inputSchema: CreateWorkOrderArgsSchema.shape as any,
+};
+
+const updateWorkOrderTool: Tool = {
+  name: "stateset_update_work_order",
+  description: "Updates a work order record",
+  inputSchema: UpdateWorkOrderArgsSchema.shape as any,
+};
+
+const createManufacturerOrderTool: Tool = {
+  name: "stateset_create_manufacturer_order",
+  description: "Creates a manufacturer order record",
+  inputSchema: CreateManufacturerOrderArgsSchema.shape as any,
+};
+
+const updateManufacturerOrderTool: Tool = {
+  name: "stateset_update_manufacturer_order",
+  description: "Updates a manufacturer order record",
+  inputSchema: UpdateManufacturerOrderArgsSchema.shape as any,
+};
+
+const createInvoiceTool: Tool = {
+  name: "stateset_create_invoice",
+  description: "Creates an invoice record",
+  inputSchema: CreateInvoiceArgsSchema.shape as any,
+};
+
+const updateInvoiceTool: Tool = {
+  name: "stateset_update_invoice",
+  description: "Updates an invoice record",
+  inputSchema: UpdateInvoiceArgsSchema.shape as any,
+};
+
+const createPaymentTool: Tool = {
+  name: "stateset_create_payment",
+  description: "Creates a payment record",
+  inputSchema: CreatePaymentArgsSchema.shape as any,
+};
+
+
 // Resource Templates
 const resourceTemplates: ResourceTemplate[] = [
   {
@@ -436,13 +807,48 @@ const resourceTemplates: ResourceTemplate[] = [
     parameters: { shipmentId: { type: "string", description: "Shipment ID" } },
     examples: ["stateset-shipment:///SHIP-123"],
   },
+  {
+    uriTemplate: "stateset-bill-of-materials:///{billOfMaterialsId}",
+    name: "StateSet Bill of Materials",
+    description: "Bill of Materials record",
+    parameters: { billOfMaterialsId: { type: "string", description: "Bill of Materials ID" } },
+    examples: ["stateset-bill-of-materials:///BOM-123"],
+  },
+  {
+    uriTemplate: "stateset-work-order:///{workOrderId}",
+    name: "StateSet Work Order",
+    description: "Work Order record",
+    parameters: { workOrderId: { type: "string", description: "Work Order ID" } },
+    examples: ["stateset-work-order:///WO-123"],
+  },
+  {
+    uriTemplate: "stateset-manufacturer-order:///{manufacturerOrderId}",
+    name: "StateSet Manufacturer Order",
+    description: "Manufacturer Order record",
+    parameters: { manufacturerOrderId: { type: "string", description: "Manufacturer Order ID" } },
+    examples: ["stateset-manufacturer-order:///MO-123"],
+  },
+  {
+    uriTemplate: "stateset-invoice:///{invoiceId}",
+    name: "StateSet Invoice",
+    description: "Invoice record",
+    parameters: { invoiceId: { type: "string", description: "Invoice ID" } },
+    examples: ["stateset-invoice:///INV-123"],
+  },
+  {
+    uriTemplate: "stateset-payment:///{paymentId}",
+    name: "StateSet Payment",
+    description: "Payment record",
+    parameters: { paymentId: { type: "string", description: "Payment ID" } },
+    examples: ["stateset-payment:///PAY-123"],
+  },
 ];
 
 // Server Prompt
 const serverPrompt: Prompt = {
   name: "stateset-server-prompt",
   description: "StateSet MCP server instructions",
-  instructions: `Manages RMAs, orders, warranties, and shipments.
+  instructions: `Manages RMAs, orders, warranties, shipments, and other related tasks.
 
 Capabilities:
 - stateset_create_rma: Create returns
@@ -450,6 +856,12 @@ Capabilities:
 - stateset_create_order: Create orders
 - stateset_create_warranty: Register warranties
 - stateset_create_shipment: Manage shipments
+- stateset_create_bill_of_materials: Create bill of materials
+- stateset_update_bill_of_materials: Update bill of materials
+- stateset_create_work_order: Create work orders
+- stateset_update_work_order: Update work orders
+- stateset_create_manufacturer_order: Create manufacturer orders
+- stateset_update_manufacturer_order: Update manufacturer orders
 
 Best practices:
 - Validate all IDs before use
@@ -492,6 +904,27 @@ async function main(): Promise<void> {
             return await client.createWarranty(CreateWarrantyArgsSchema.parse(request.params.arguments));
           case "stateset_create_shipment":
             return await client.createShipment(CreateShipmentArgsSchema.parse(request.params.arguments));
+          case "stateset_create_bill_of_materials":
+            return await client.createBillOfMaterials(CreateBillOfMaterialsArgsSchema.parse(request.params.arguments));
+          case "stateset_update_bill_of_materials":
+            return await client.updateBillOfMaterials(UpdateBillOfMaterialsArgsSchema.parse(request.params.arguments));
+          case "stateset_create_work_order":
+            return await client.createWorkOrder(CreateWorkOrderArgsSchema.parse(request.params.arguments));
+          case "stateset_update_work_order":
+            return await client.updateWorkOrder(UpdateWorkOrderArgsSchema.parse(request.params.arguments));
+          case "stateset_create_manufacturer_order":
+            return await client.createManufacturerOrder(CreateManufacturerOrderArgsSchema.parse(request.params.arguments));
+          case "stateset_update_manufacturer_order":
+            return await client.updateManufacturerOrder(UpdateManufacturerOrderArgsSchema.parse(request.params.arguments));
+          case "stateset_create_invoice":
+            return await client.createInvoice(CreateInvoiceArgsSchema.parse(request.params.arguments));
+          case "stateset_update_invoice":
+            return await client.updateInvoice(UpdateInvoiceArgsSchema.parse(request.params.arguments));
+          case "stateset_create_payment":
+            return await client.createPayment(CreatePaymentArgsSchema.parse(request.params.arguments));
+          case "stateset_update_payment":
+            return await client.updatePayment(UpdatePaymentArgsSchema.parse(request.params.arguments));
+
           default:
             throw new Error(`Unknown tool: ${request.params.name}`);
         }
@@ -526,7 +959,7 @@ async function main(): Promise<void> {
     }));
 
     const transport = new StdioServerTransport();
-    await transport.listen(server);
+    await server.listen(transport);
     
     logger.info('Server started successfully');
   } catch (error) {
