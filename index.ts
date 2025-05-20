@@ -776,6 +776,12 @@ const createPaymentTool: Tool = {
   inputSchema: CreatePaymentArgsSchema.shape as any,
 };
 
+const updatePaymentTool: Tool = {
+  name: "stateset_update_payment",
+  description: "Updates a payment record",
+  inputSchema: UpdatePaymentArgsSchema.shape as any,
+};
+
 
 // Resource Templates
 const resourceTemplates: ResourceTemplate[] = [
@@ -862,6 +868,10 @@ Capabilities:
 - stateset_update_work_order: Update work orders
 - stateset_create_manufacturer_order: Create manufacturer orders
 - stateset_update_manufacturer_order: Update manufacturer orders
+- stateset_create_invoice: Create invoices
+- stateset_update_invoice: Update invoices
+- stateset_create_payment: Create payments
+- stateset_update_payment: Update payments
 
 Best practices:
 - Validate all IDs before use
@@ -951,7 +961,23 @@ async function main(): Promise<void> {
     });
 
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [createRMATool, updateRMATool, createOrderTool, createWarrantyTool, createShipmentTool],
+      tools: [
+        createRMATool,
+        updateRMATool,
+        createOrderTool,
+        createWarrantyTool,
+        createShipmentTool,
+        createBillOfMaterialsTool,
+        updateBillOfMaterialsTool,
+        createWorkOrderTool,
+        updateWorkOrderTool,
+        createManufacturerOrderTool,
+        updateManufacturerOrderTool,
+        createInvoiceTool,
+        updateInvoiceTool,
+        createPaymentTool,
+        updatePaymentTool,
+      ],
     }));
 
     server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
