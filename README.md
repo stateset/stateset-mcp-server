@@ -17,9 +17,10 @@ The server exposes a variety of MCP tools for creating, updating, deleting and r
 - `stateset_create_manufacturer_order`, `stateset_update_manufacturer_order`, `stateset_delete_manufacturer_order`, `stateset_get_manufacturer_order`
 - `stateset_create_invoice`, `stateset_update_invoice`, `stateset_delete_invoice`, `stateset_get_invoice`
 - `stateset_create_payment`, `stateset_update_payment`, `stateset_delete_payment`, `stateset_get_payment`
+- `stateset_create_customer`, `stateset_update_customer`, `stateset_delete_customer`, `stateset_get_customer`
 - `stateset_list_rmas`, `stateset_list_orders`, `stateset_list_warranties`, `stateset_list_shipments`
 - `stateset_list_bill_of_materials`, `stateset_list_work_orders`, `stateset_list_manufacturer_orders`
-- `stateset_list_invoices`, `stateset_list_payments`
+- `stateset_list_invoices`, `stateset_list_payments`, `stateset_list_customers`
 
 ## Usage
 
