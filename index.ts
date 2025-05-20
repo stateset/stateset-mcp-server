@@ -325,6 +325,29 @@ interface GetPaymentArgs {
   payment_id: string;
 }
 
+interface CreateProductArgs {
+  name: string;
+  sku: string;
+  description?: string;
+  price: number;
+}
+
+interface UpdateProductArgs {
+  product_id: string;
+  name?: string;
+  sku?: string;
+  description?: string;
+  price?: number;
+}
+
+interface DeleteProductArgs {
+  product_id: string;
+}
+
+interface GetProductArgs {
+  product_id: string;
+}
+
 interface ListArgs {
   page?: number;
   per_page?: number;
@@ -905,6 +928,46 @@ class StateSetMCPClient {
     );
     return this.enrichListResponse(response.data);
   }
+
+  async createProduct(args: CreateProductArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.post('/products', args),
+      'createProduct'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async updateProduct(args: UpdateProductArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/products/${args.product_id}`, args),
+      'updateProduct'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deleteProduct(args: DeleteProductArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/products/${args.product_id}`),
+      'deleteProduct'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getProduct(productId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/products/${productId}`),
+      'getProduct'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async listProducts(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/products', { params: args }),
+      'listProducts'
+    );
+    return this.enrichListResponse(response.data);
+  }
 }
 
 // Zod Schemas
@@ -1230,6 +1293,29 @@ const GetPaymentArgsSchema = z.object({
   payment_id: z.string().min(1, "Payment ID is required"),
 });
 
+const CreateProductArgsSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  sku: z.string().min(1, "SKU is required"),
+  description: z.string().optional(),
+  price: z.number().positive("Price must be positive"),
+});
+
+const UpdateProductArgsSchema = z.object({
+  product_id: z.string().min(1, "Product ID is required"),
+  name: z.string().min(1, "Name is required").optional(),
+  sku: z.string().min(1, "SKU is required").optional(),
+  description: z.string().optional(),
+  price: z.number().positive("Price must be positive").optional(),
+});
+
+const DeleteProductArgsSchema = z.object({
+  product_id: z.string().min(1, "Product ID is required"),
+});
+
+const GetProductArgsSchema = z.object({
+  product_id: z.string().min(1, "Product ID is required"),
+});
+
 const ListArgsSchema = z.object({
   page: z.number().positive().optional(),
   per_page: z.number().positive().optional(),
@@ -1345,6 +1431,18 @@ const updatePaymentTool: Tool = {
   inputSchema: UpdatePaymentArgsSchema.shape as any,
 };
 
+const createProductTool: Tool = {
+  name: "stateset_create_product",
+  description: "Creates a product record",
+  inputSchema: CreateProductArgsSchema.shape as any,
+};
+
+const updateProductTool: Tool = {
+  name: "stateset_update_product",
+  description: "Updates a product record",
+  inputSchema: UpdateProductArgsSchema.shape as any,
+};
+
 const createCustomerTool: Tool = {
   name: "stateset_create_customer",
   description: "Creates a customer record",
@@ -1411,6 +1509,12 @@ const deletePaymentTool: Tool = {
   inputSchema: DeletePaymentArgsSchema.shape as any,
 };
 
+const deleteProductTool: Tool = {
+  name: "stateset_delete_product",
+  description: "Deletes a product record",
+  inputSchema: DeleteProductArgsSchema.shape as any,
+};
+
 const deleteCustomerTool: Tool = {
   name: "stateset_delete_customer",
   description: "Deletes a customer record",
@@ -1471,6 +1575,12 @@ const getPaymentTool: Tool = {
   inputSchema: GetPaymentArgsSchema.shape as any,
 };
 
+const getProductTool: Tool = {
+  name: "stateset_get_product",
+  description: "Retrieves a product record",
+  inputSchema: GetProductArgsSchema.shape as any,
+};
+
 const getCustomerTool: Tool = {
   name: "stateset_get_customer",
   description: "Retrieves a customer record",
@@ -1528,6 +1638,12 @@ const listInvoicesTool: Tool = {
 const listPaymentsTool: Tool = {
   name: "stateset_list_payments",
   description: "Lists payment records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
+const listProductsTool: Tool = {
+  name: "stateset_list_products",
+  description: "Lists product records",
   inputSchema: ListArgsSchema.shape as any,
 };
 
@@ -1604,6 +1720,13 @@ const resourceTemplates: ResourceTemplate[] = [
     examples: ["stateset-payment:///PAY-123"],
   },
   {
+    uriTemplate: "stateset-product:///{productId}",
+    name: "StateSet Product",
+    description: "Product record",
+    parameters: { productId: { type: "string", description: "Product ID" } },
+    examples: ["stateset-product:///PROD-123"],
+  },
+  {
     uriTemplate: "stateset-customer:///{customerId}",
     name: "StateSet Customer",
     description: "Customer record",
@@ -1637,6 +1760,8 @@ Capabilities:
 - stateset_update_invoice: Update invoices
 - stateset_create_payment: Create payments
 - stateset_update_payment: Update payments
+- stateset_create_product: Create products
+- stateset_update_product: Update products
 - stateset_create_customer: Create customers
 - stateset_update_customer: Update customers
 - stateset_delete_rma: Delete returns
@@ -1648,6 +1773,7 @@ Capabilities:
 - stateset_delete_manufacturer_order: Delete manufacturer orders
 - stateset_delete_invoice: Delete invoices
 - stateset_delete_payment: Delete payments
+- stateset_delete_product: Delete products
 - stateset_delete_customer: Delete customers
 - stateset_get_rma: Fetch RMA details
 - stateset_get_order: Fetch order details
@@ -1658,6 +1784,7 @@ Capabilities:
 - stateset_get_manufacturer_order: Fetch manufacturer order details
 - stateset_get_invoice: Fetch invoice details
 - stateset_get_payment: Fetch payment details
+- stateset_get_product: Fetch product details
 - stateset_get_customer: Fetch customer details
 - stateset_list_rmas: List RMAs
 - stateset_list_orders: List orders
@@ -1668,6 +1795,7 @@ Capabilities:
 - stateset_list_manufacturer_orders: List manufacturer orders
 - stateset_list_invoices: List invoices
 - stateset_list_payments: List payments
+- stateset_list_products: List products
 - stateset_list_customers: List customers
 
 Best practices:
@@ -1743,6 +1871,10 @@ async function main(): Promise<void> {
             return await client.createPayment(CreatePaymentArgsSchema.parse(request.params.arguments));
           case "stateset_update_payment":
             return await client.updatePayment(UpdatePaymentArgsSchema.parse(request.params.arguments));
+          case "stateset_create_product":
+            return await client.createProduct(CreateProductArgsSchema.parse(request.params.arguments));
+          case "stateset_update_product":
+            return await client.updateProduct(UpdateProductArgsSchema.parse(request.params.arguments));
           case "stateset_create_customer":
             return await client.createCustomer(CreateCustomerArgsSchema.parse(request.params.arguments));
           case "stateset_update_customer":
@@ -1765,6 +1897,8 @@ async function main(): Promise<void> {
             return await client.deleteInvoice(DeleteInvoiceArgsSchema.parse(request.params.arguments));
           case "stateset_delete_payment":
             return await client.deletePayment(DeletePaymentArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_product":
+            return await client.deleteProduct(DeleteProductArgsSchema.parse(request.params.arguments));
           case "stateset_delete_customer":
             return await client.deleteCustomer(DeleteCustomerArgsSchema.parse(request.params.arguments));
           case "stateset_get_rma":
@@ -1785,6 +1919,8 @@ async function main(): Promise<void> {
             return await client.getInvoice(GetInvoiceArgsSchema.parse(request.params.arguments).invoice_id);
           case "stateset_get_payment":
             return await client.getPayment(GetPaymentArgsSchema.parse(request.params.arguments).payment_id);
+          case "stateset_get_product":
+            return await client.getProduct(GetProductArgsSchema.parse(request.params.arguments).product_id);
           case "stateset_get_customer":
             return await client.getCustomer(GetCustomerArgsSchema.parse(request.params.arguments).customer_id);
 
@@ -1806,6 +1942,8 @@ async function main(): Promise<void> {
             return await client.listInvoices(ListArgsSchema.parse(request.params.arguments));
           case "stateset_list_payments":
             return await client.listPayments(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_list_products":
+            return await client.listProducts(ListArgsSchema.parse(request.params.arguments));
           case "stateset_list_customers":
             return await client.listCustomers(ListArgsSchema.parse(request.params.arguments));
 
@@ -1850,6 +1988,9 @@ async function main(): Promise<void> {
         case 'stateset-payment:':
           const payment = await client.getPayment(path);
           return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(payment, null, 2) }] };
+        case 'stateset-product:':
+          const product = await client.getProduct(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(product, null, 2) }] };
         case 'stateset-customer:':
           const customer = await client.getCustomer(path);
           return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(customer, null, 2) }] };
@@ -1878,6 +2019,8 @@ async function main(): Promise<void> {
         updateInvoiceTool,
         createPaymentTool,
         updatePaymentTool,
+        createProductTool,
+        updateProductTool,
         createCustomerTool,
         updateCustomerTool,
         deleteRMATool,
@@ -1889,6 +2032,7 @@ async function main(): Promise<void> {
         deleteManufacturerOrderTool,
         deleteInvoiceTool,
         deletePaymentTool,
+        deleteProductTool,
         deleteCustomerTool,
         getRMATool,
         getOrderTool,
@@ -1899,6 +2043,7 @@ async function main(): Promise<void> {
         getManufacturerOrderTool,
         getInvoiceTool,
         getPaymentTool,
+        getProductTool,
         getCustomerTool,
         listRMAsTool,
         listOrdersTool,
@@ -1909,6 +2054,7 @@ async function main(): Promise<void> {
         listManufacturerOrdersTool,
         listInvoicesTool,
         listPaymentsTool,
+        listProductsTool,
         listCustomersTool,
       ],
     }));
