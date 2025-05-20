@@ -232,6 +232,42 @@ interface UpdatePaymentArgs {
   notes?: string;
 }
 
+interface DeleteRMAArgs {
+  rma_id: string;
+}
+
+interface DeleteOrderArgs {
+  order_id: string;
+}
+
+interface DeleteWarrantyArgs {
+  warranty_id: string;
+}
+
+interface DeleteShipmentArgs {
+  shipment_id: string;
+}
+
+interface DeleteBillOfMaterialsArgs {
+  bill_of_materials_id: string;
+}
+
+interface DeleteWorkOrderArgs {
+  work_order_id: string;
+}
+
+interface DeleteManufacturerOrderArgs {
+  manufacturer_order_id: string;
+}
+
+interface DeleteInvoiceArgs {
+  invoice_id: string;
+}
+
+interface DeletePaymentArgs {
+  payment_id: string;
+}
+
 interface GetRMAArgs {
   rma_id: string;
 }
@@ -652,6 +688,78 @@ class StateSetMCPClient {
     );
     return this.enrichResponse(response.data);
   }
+
+  async deleteRMA(args: DeleteRMAArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/rmas/${args.rma_id}`),
+      'deleteRMA'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deleteOrder(args: DeleteOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/orders/${args.order_id}`),
+      'deleteOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deleteWarranty(args: DeleteWarrantyArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/warranties/${args.warranty_id}`),
+      'deleteWarranty'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deleteShipment(args: DeleteShipmentArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/shipments/${args.shipment_id}`),
+      'deleteShipment'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deleteBillOfMaterials(args: DeleteBillOfMaterialsArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/bill-of-materials/${args.bill_of_materials_id}`),
+      'deleteBillOfMaterials'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deleteWorkOrder(args: DeleteWorkOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/work-orders/${args.work_order_id}`),
+      'deleteWorkOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deleteManufacturerOrder(args: DeleteManufacturerOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/manufacturer-orders/${args.manufacturer_order_id}`),
+      'deleteManufacturerOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deleteInvoice(args: DeleteInvoiceArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/invoices/${args.invoice_id}`),
+      'deleteInvoice'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deletePayment(args: DeletePaymentArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/payments/${args.payment_id}`),
+      'deletePayment'
+    );
+    return this.enrichResponse(response.data);
+  }
 }
 
 // Zod Schemas
@@ -872,6 +980,42 @@ const UpdatePaymentArgsSchema = z.object({
   notes: z.string().optional(),
 });
 
+const DeleteRMAArgsSchema = z.object({
+  rma_id: z.string().min(1, "RMA ID is required"),
+});
+
+const DeleteOrderArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+});
+
+const DeleteWarrantyArgsSchema = z.object({
+  warranty_id: z.string().min(1, "Warranty ID is required"),
+});
+
+const DeleteShipmentArgsSchema = z.object({
+  shipment_id: z.string().min(1, "Shipment ID is required"),
+});
+
+const DeleteBillOfMaterialsArgsSchema = z.object({
+  bill_of_materials_id: z.string().min(1, "Bill of Materials ID is required"),
+});
+
+const DeleteWorkOrderArgsSchema = z.object({
+  work_order_id: z.string().min(1, "Work Order ID is required"),
+});
+
+const DeleteManufacturerOrderArgsSchema = z.object({
+  manufacturer_order_id: z.string().min(1, "Manufacturer Order ID is required"),
+});
+
+const DeleteInvoiceArgsSchema = z.object({
+  invoice_id: z.string().min(1, "Invoice ID is required"),
+});
+
+const DeletePaymentArgsSchema = z.object({
+  payment_id: z.string().min(1, "Payment ID is required"),
+});
+
 const GetRMAArgsSchema = z.object({
   rma_id: z.string().min(1, "RMA ID is required"),
 });
@@ -1016,6 +1160,60 @@ const updatePaymentTool: Tool = {
   name: "stateset_update_payment",
   description: "Updates a payment record",
   inputSchema: UpdatePaymentArgsSchema.shape as any,
+};
+
+const deleteRMATool: Tool = {
+  name: "stateset_delete_rma",
+  description: "Deletes an RMA record",
+  inputSchema: DeleteRMAArgsSchema.shape as any,
+};
+
+const deleteOrderTool: Tool = {
+  name: "stateset_delete_order",
+  description: "Deletes an order record",
+  inputSchema: DeleteOrderArgsSchema.shape as any,
+};
+
+const deleteWarrantyTool: Tool = {
+  name: "stateset_delete_warranty",
+  description: "Deletes a warranty record",
+  inputSchema: DeleteWarrantyArgsSchema.shape as any,
+};
+
+const deleteShipmentTool: Tool = {
+  name: "stateset_delete_shipment",
+  description: "Deletes a shipment record",
+  inputSchema: DeleteShipmentArgsSchema.shape as any,
+};
+
+const deleteBillOfMaterialsTool: Tool = {
+  name: "stateset_delete_bill_of_materials",
+  description: "Deletes a bill of materials record",
+  inputSchema: DeleteBillOfMaterialsArgsSchema.shape as any,
+};
+
+const deleteWorkOrderTool: Tool = {
+  name: "stateset_delete_work_order",
+  description: "Deletes a work order record",
+  inputSchema: DeleteWorkOrderArgsSchema.shape as any,
+};
+
+const deleteManufacturerOrderTool: Tool = {
+  name: "stateset_delete_manufacturer_order",
+  description: "Deletes a manufacturer order record",
+  inputSchema: DeleteManufacturerOrderArgsSchema.shape as any,
+};
+
+const deleteInvoiceTool: Tool = {
+  name: "stateset_delete_invoice",
+  description: "Deletes an invoice record",
+  inputSchema: DeleteInvoiceArgsSchema.shape as any,
+};
+
+const deletePaymentTool: Tool = {
+  name: "stateset_delete_payment",
+  description: "Deletes a payment record",
+  inputSchema: DeletePaymentArgsSchema.shape as any,
 };
 
 const getRMATool: Tool = {
@@ -1165,6 +1363,15 @@ Capabilities:
 - stateset_update_invoice: Update invoices
 - stateset_create_payment: Create payments
 - stateset_update_payment: Update payments
+- stateset_delete_rma: Delete returns
+- stateset_delete_order: Delete orders
+- stateset_delete_warranty: Delete warranties
+- stateset_delete_shipment: Delete shipments
+- stateset_delete_bill_of_materials: Delete bill of materials
+- stateset_delete_work_order: Delete work orders
+- stateset_delete_manufacturer_order: Delete manufacturer orders
+- stateset_delete_invoice: Delete invoices
+- stateset_delete_payment: Delete payments
 - stateset_get_rma: Fetch RMA details
 - stateset_get_order: Fetch order details
 - stateset_get_warranty: Fetch warranty details
@@ -1248,6 +1455,24 @@ async function main(): Promise<void> {
             return await client.createPayment(CreatePaymentArgsSchema.parse(request.params.arguments));
           case "stateset_update_payment":
             return await client.updatePayment(UpdatePaymentArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_rma":
+            return await client.deleteRMA(DeleteRMAArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_order":
+            return await client.deleteOrder(DeleteOrderArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_warranty":
+            return await client.deleteWarranty(DeleteWarrantyArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_shipment":
+            return await client.deleteShipment(DeleteShipmentArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_bill_of_materials":
+            return await client.deleteBillOfMaterials(DeleteBillOfMaterialsArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_work_order":
+            return await client.deleteWorkOrder(DeleteWorkOrderArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_manufacturer_order":
+            return await client.deleteManufacturerOrder(DeleteManufacturerOrderArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_invoice":
+            return await client.deleteInvoice(DeleteInvoiceArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_payment":
+            return await client.deletePayment(DeletePaymentArgsSchema.parse(request.params.arguments));
           case "stateset_get_rma":
             return await client.getRMA(GetRMAArgsSchema.parse(request.params.arguments).rma_id);
           case "stateset_get_order":
@@ -1333,6 +1558,15 @@ async function main(): Promise<void> {
         updateInvoiceTool,
         createPaymentTool,
         updatePaymentTool,
+        deleteRMATool,
+        deleteOrderTool,
+        deleteWarrantyTool,
+        deleteShipmentTool,
+        deleteBillOfMaterialsTool,
+        deleteWorkOrderTool,
+        deleteManufacturerOrderTool,
+        deleteInvoiceTool,
+        deletePaymentTool,
         getRMATool,
         getOrderTool,
         getWarrantyTool,
