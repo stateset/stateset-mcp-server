@@ -210,6 +210,42 @@ interface UpdatePaymentArgs {
   notes?: string;
 }
 
+interface GetRMAArgs {
+  rma_id: string;
+}
+
+interface GetOrderArgs {
+  order_id: string;
+}
+
+interface GetWarrantyArgs {
+  warranty_id: string;
+}
+
+interface GetShipmentArgs {
+  shipment_id: string;
+}
+
+interface GetBillOfMaterialsArgs {
+  bill_of_materials_id: string;
+}
+
+interface GetWorkOrderArgs {
+  work_order_id: string;
+}
+
+interface GetManufacturerOrderArgs {
+  manufacturer_order_id: string;
+}
+
+interface GetInvoiceArgs {
+  invoice_id: string;
+}
+
+interface GetPaymentArgs {
+  payment_id: string;
+}
+
 // Rate Limiter
 class RateLimiter {
   private readonly requestsPerHour: number;
@@ -431,6 +467,62 @@ class StateSetMCPClient {
     const response = await this.rateLimiter.enqueue(
       () => this.apiClient.get(`/orders/${orderId}`),
       'getOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getWarranty(warrantyId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/warranties/${warrantyId}`),
+      'getWarranty'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getShipment(shipmentId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/shipments/${shipmentId}`),
+      'getShipment'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getBillOfMaterials(bomId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/bill-of-materials/${bomId}`),
+      'getBillOfMaterials'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getWorkOrder(workOrderId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/work-orders/${workOrderId}`),
+      'getWorkOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getManufacturerOrder(manufacturerOrderId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/manufacturer-orders/${manufacturerOrderId}`),
+      'getManufacturerOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getInvoice(invoiceId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/invoices/${invoiceId}`),
+      'getInvoice'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getPayment(paymentId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/payments/${paymentId}`),
+      'getPayment'
     );
     return this.enrichResponse(response.data);
   }
@@ -690,6 +782,42 @@ const UpdatePaymentArgsSchema = z.object({
   notes: z.string().optional(),
 });
 
+const GetRMAArgsSchema = z.object({
+  rma_id: z.string().min(1, "RMA ID is required"),
+});
+
+const GetOrderArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+});
+
+const GetWarrantyArgsSchema = z.object({
+  warranty_id: z.string().min(1, "Warranty ID is required"),
+});
+
+const GetShipmentArgsSchema = z.object({
+  shipment_id: z.string().min(1, "Shipment ID is required"),
+});
+
+const GetBillOfMaterialsArgsSchema = z.object({
+  bill_of_materials_id: z.string().min(1, "Bill of Materials ID is required"),
+});
+
+const GetWorkOrderArgsSchema = z.object({
+  work_order_id: z.string().min(1, "Work Order ID is required"),
+});
+
+const GetManufacturerOrderArgsSchema = z.object({
+  manufacturer_order_id: z.string().min(1, "Manufacturer Order ID is required"),
+});
+
+const GetInvoiceArgsSchema = z.object({
+  invoice_id: z.string().min(1, "Invoice ID is required"),
+});
+
+const GetPaymentArgsSchema = z.object({
+  payment_id: z.string().min(1, "Payment ID is required"),
+});
+
 
 // Tool Definitions
 const createRMATool: Tool = {
@@ -782,6 +910,60 @@ const updatePaymentTool: Tool = {
   inputSchema: UpdatePaymentArgsSchema.shape as any,
 };
 
+const getRMATool: Tool = {
+  name: "stateset_get_rma",
+  description: "Retrieves an RMA record",
+  inputSchema: GetRMAArgsSchema.shape as any,
+};
+
+const getOrderTool: Tool = {
+  name: "stateset_get_order",
+  description: "Retrieves an order record",
+  inputSchema: GetOrderArgsSchema.shape as any,
+};
+
+const getWarrantyTool: Tool = {
+  name: "stateset_get_warranty",
+  description: "Retrieves a warranty record",
+  inputSchema: GetWarrantyArgsSchema.shape as any,
+};
+
+const getShipmentTool: Tool = {
+  name: "stateset_get_shipment",
+  description: "Retrieves a shipment record",
+  inputSchema: GetShipmentArgsSchema.shape as any,
+};
+
+const getBillOfMaterialsTool: Tool = {
+  name: "stateset_get_bill_of_materials",
+  description: "Retrieves a bill of materials record",
+  inputSchema: GetBillOfMaterialsArgsSchema.shape as any,
+};
+
+const getWorkOrderTool: Tool = {
+  name: "stateset_get_work_order",
+  description: "Retrieves a work order record",
+  inputSchema: GetWorkOrderArgsSchema.shape as any,
+};
+
+const getManufacturerOrderTool: Tool = {
+  name: "stateset_get_manufacturer_order",
+  description: "Retrieves a manufacturer order record",
+  inputSchema: GetManufacturerOrderArgsSchema.shape as any,
+};
+
+const getInvoiceTool: Tool = {
+  name: "stateset_get_invoice",
+  description: "Retrieves an invoice record",
+  inputSchema: GetInvoiceArgsSchema.shape as any,
+};
+
+const getPaymentTool: Tool = {
+  name: "stateset_get_payment",
+  description: "Retrieves a payment record",
+  inputSchema: GetPaymentArgsSchema.shape as any,
+};
+
 
 // Resource Templates
 const resourceTemplates: ResourceTemplate[] = [
@@ -872,6 +1054,15 @@ Capabilities:
 - stateset_update_invoice: Update invoices
 - stateset_create_payment: Create payments
 - stateset_update_payment: Update payments
+- stateset_get_rma: Fetch RMA details
+- stateset_get_order: Fetch order details
+- stateset_get_warranty: Fetch warranty details
+- stateset_get_shipment: Fetch shipment details
+- stateset_get_bill_of_materials: Fetch bill of materials details
+- stateset_get_work_order: Fetch work order details
+- stateset_get_manufacturer_order: Fetch manufacturer order details
+- stateset_get_invoice: Fetch invoice details
+- stateset_get_payment: Fetch payment details
 
 Best practices:
 - Validate all IDs before use
@@ -940,6 +1131,24 @@ async function main(): Promise<void> {
             return await client.createPayment(CreatePaymentArgsSchema.parse(request.params.arguments));
           case "stateset_update_payment":
             return await client.updatePayment(UpdatePaymentArgsSchema.parse(request.params.arguments));
+          case "stateset_get_rma":
+            return await client.getRMA(GetRMAArgsSchema.parse(request.params.arguments).rma_id);
+          case "stateset_get_order":
+            return await client.getOrder(GetOrderArgsSchema.parse(request.params.arguments).order_id);
+          case "stateset_get_warranty":
+            return await client.getWarranty(GetWarrantyArgsSchema.parse(request.params.arguments).warranty_id);
+          case "stateset_get_shipment":
+            return await client.getShipment(GetShipmentArgsSchema.parse(request.params.arguments).shipment_id);
+          case "stateset_get_bill_of_materials":
+            return await client.getBillOfMaterials(GetBillOfMaterialsArgsSchema.parse(request.params.arguments).bill_of_materials_id);
+          case "stateset_get_work_order":
+            return await client.getWorkOrder(GetWorkOrderArgsSchema.parse(request.params.arguments).work_order_id);
+          case "stateset_get_manufacturer_order":
+            return await client.getManufacturerOrder(GetManufacturerOrderArgsSchema.parse(request.params.arguments).manufacturer_order_id);
+          case "stateset_get_invoice":
+            return await client.getInvoice(GetInvoiceArgsSchema.parse(request.params.arguments).invoice_id);
+          case "stateset_get_payment":
+            return await client.getPayment(GetPaymentArgsSchema.parse(request.params.arguments).payment_id);
 
           default:
             throw new Error(`Unknown tool: ${request.params.name}`);
@@ -961,6 +1170,27 @@ async function main(): Promise<void> {
         case 'stateset-order:':
           const order = await client.getOrder(path);
           return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(order, null, 2) }] };
+        case 'stateset-warranty:':
+          const warranty = await client.getWarranty(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(warranty, null, 2) }] };
+        case 'stateset-shipment:':
+          const shipment = await client.getShipment(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(shipment, null, 2) }] };
+        case 'stateset-bill-of-materials:':
+          const bom = await client.getBillOfMaterials(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(bom, null, 2) }] };
+        case 'stateset-work-order:':
+          const wo = await client.getWorkOrder(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(wo, null, 2) }] };
+        case 'stateset-manufacturer-order:':
+          const mo = await client.getManufacturerOrder(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(mo, null, 2) }] };
+        case 'stateset-invoice:':
+          const invoice = await client.getInvoice(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(invoice, null, 2) }] };
+        case 'stateset-payment:':
+          const payment = await client.getPayment(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(payment, null, 2) }] };
         default:
           throw new Error(`Unsupported URI: ${request.params.uri}`);
       }
@@ -983,6 +1213,15 @@ async function main(): Promise<void> {
         updateInvoiceTool,
         createPaymentTool,
         updatePaymentTool,
+        getRMATool,
+        getOrderTool,
+        getWarrantyTool,
+        getShipmentTool,
+        getBillOfMaterialsTool,
+        getWorkOrderTool,
+        getManufacturerOrderTool,
+        getInvoiceTool,
+        getPaymentTool,
       ],
     }));
 
