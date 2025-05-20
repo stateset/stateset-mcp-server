@@ -304,6 +304,11 @@ interface GetPaymentArgs {
   payment_id: string;
 }
 
+interface ListArgs {
+  page?: number;
+  per_page?: number;
+}
+
 // Rate Limiter
 class RateLimiter {
   private readonly requestsPerHour: number;
@@ -416,6 +421,13 @@ class StateSetMCPClient {
   private enrichResponse<T>(data: T): T & { metadata: { apiMetrics: RateLimiterMetrics } } {
     return {
       ...data,
+      metadata: { apiMetrics: this.rateLimiter.getMetrics() },
+    };
+  }
+
+  private enrichListResponse<T>(data: T[]): { items: T[]; metadata: { apiMetrics: RateLimiterMetrics } } {
+    return {
+      items: data,
       metadata: { apiMetrics: this.rateLimiter.getMetrics() },
     };
   }
@@ -760,6 +772,78 @@ class StateSetMCPClient {
     );
     return this.enrichResponse(response.data);
   }
+
+  async listRMAs(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/rmas', { params: args }),
+      'listRMAs'
+    );
+    return this.enrichListResponse(response.data);
+  }
+
+  async listOrders(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/orders', { params: args }),
+      'listOrders'
+    );
+    return this.enrichListResponse(response.data);
+  }
+
+  async listWarranties(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/warranties', { params: args }),
+      'listWarranties'
+    );
+    return this.enrichListResponse(response.data);
+  }
+
+  async listShipments(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/shipments', { params: args }),
+      'listShipments'
+    );
+    return this.enrichListResponse(response.data);
+  }
+
+  async listBillOfMaterials(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/bill-of-materials', { params: args }),
+      'listBillOfMaterials'
+    );
+    return this.enrichListResponse(response.data);
+  }
+
+  async listWorkOrders(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/work-orders', { params: args }),
+      'listWorkOrders'
+    );
+    return this.enrichListResponse(response.data);
+  }
+
+  async listManufacturerOrders(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/manufacturer-orders', { params: args }),
+      'listManufacturerOrders'
+    );
+    return this.enrichListResponse(response.data);
+  }
+
+  async listInvoices(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/invoices', { params: args }),
+      'listInvoices'
+    );
+    return this.enrichListResponse(response.data);
+  }
+
+  async listPayments(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/payments', { params: args }),
+      'listPayments'
+    );
+    return this.enrichListResponse(response.data);
+  }
 }
 
 // Zod Schemas
@@ -1052,6 +1136,11 @@ const GetPaymentArgsSchema = z.object({
   payment_id: z.string().min(1, "Payment ID is required"),
 });
 
+const ListArgsSchema = z.object({
+  page: z.number().positive().optional(),
+  per_page: z.number().positive().optional(),
+});
+
 
 // Tool Definitions
 const createRMATool: Tool = {
@@ -1270,6 +1359,60 @@ const getPaymentTool: Tool = {
   inputSchema: GetPaymentArgsSchema.shape as any,
 };
 
+const listRMAsTool: Tool = {
+  name: "stateset_list_rmas",
+  description: "Lists RMA records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
+const listOrdersTool: Tool = {
+  name: "stateset_list_orders",
+  description: "Lists order records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
+const listWarrantiesTool: Tool = {
+  name: "stateset_list_warranties",
+  description: "Lists warranty records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
+const listShipmentsTool: Tool = {
+  name: "stateset_list_shipments",
+  description: "Lists shipment records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
+const listBillOfMaterialsTool: Tool = {
+  name: "stateset_list_bill_of_materials",
+  description: "Lists bill of materials records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
+const listWorkOrdersTool: Tool = {
+  name: "stateset_list_work_orders",
+  description: "Lists work order records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
+const listManufacturerOrdersTool: Tool = {
+  name: "stateset_list_manufacturer_orders",
+  description: "Lists manufacturer order records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
+const listInvoicesTool: Tool = {
+  name: "stateset_list_invoices",
+  description: "Lists invoice records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
+const listPaymentsTool: Tool = {
+  name: "stateset_list_payments",
+  description: "Lists payment records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
 
 // Resource Templates
 const resourceTemplates: ResourceTemplate[] = [
@@ -1381,6 +1524,15 @@ Capabilities:
 - stateset_get_manufacturer_order: Fetch manufacturer order details
 - stateset_get_invoice: Fetch invoice details
 - stateset_get_payment: Fetch payment details
+- stateset_list_rmas: List RMAs
+- stateset_list_orders: List orders
+- stateset_list_warranties: List warranties
+- stateset_list_shipments: List shipments
+- stateset_list_bill_of_materials: List bill of materials
+- stateset_list_work_orders: List work orders
+- stateset_list_manufacturer_orders: List manufacturer orders
+- stateset_list_invoices: List invoices
+- stateset_list_payments: List payments
 
 Best practices:
 - Validate all IDs before use
@@ -1492,6 +1644,25 @@ async function main(): Promise<void> {
           case "stateset_get_payment":
             return await client.getPayment(GetPaymentArgsSchema.parse(request.params.arguments).payment_id);
 
+          case "stateset_list_rmas":
+            return await client.listRMAs(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_list_orders":
+            return await client.listOrders(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_list_warranties":
+            return await client.listWarranties(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_list_shipments":
+            return await client.listShipments(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_list_bill_of_materials":
+            return await client.listBillOfMaterials(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_list_work_orders":
+            return await client.listWorkOrders(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_list_manufacturer_orders":
+            return await client.listManufacturerOrders(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_list_invoices":
+            return await client.listInvoices(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_list_payments":
+            return await client.listPayments(ListArgsSchema.parse(request.params.arguments));
+
           default:
             throw new Error(`Unknown tool: ${request.params.name}`);
         }
@@ -1576,6 +1747,15 @@ async function main(): Promise<void> {
         getManufacturerOrderTool,
         getInvoiceTool,
         getPaymentTool,
+        listRMAsTool,
+        listOrdersTool,
+        listWarrantiesTool,
+        listShipmentsTool,
+        listBillOfMaterialsTool,
+        listWorkOrdersTool,
+        listManufacturerOrdersTool,
+        listInvoicesTool,
+        listPaymentsTool,
       ],
     }));
 
