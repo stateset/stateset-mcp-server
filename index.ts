@@ -130,10 +130,24 @@ interface CreateOrderArgs {
   billing_address?: Address;
 }
 
+interface UpdateOrderArgs {
+  order_id: string;
+  status?: string;
+  items?: OrderItem[];
+  shipping_address?: Address;
+  billing_address?: Address;
+}
+
 interface CreateWarrantyArgs {
   order_id: string;
   customer_email: string;
   items: WarrantyItem[];
+  notes?: string;
+}
+
+interface UpdateWarrantyArgs {
+  warranty_id: string;
+  status?: string;
   notes?: string;
 }
 
@@ -143,6 +157,14 @@ interface CreateShipmentArgs {
   items: ShipmentItem[];
   carrier: string;
   destination_address: Address;
+}
+
+interface UpdateShipmentArgs {
+  shipment_id: string;
+  carrier?: string;
+  status?: string;
+  tracking_number?: string;
+  destination_address?: Address;
 }
 
 interface CreateBillOfMaterialsArgs {
@@ -412,6 +434,14 @@ class StateSetMCPClient {
     });
   }
 
+  async updateOrder(args: UpdateOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/orders/${args.order_id}`, args),
+      'updateOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
   async createWarranty(args: CreateWarrantyArgs): Promise<StateSetResponse> {
     const response = await this.rateLimiter.enqueue(
       () => this.apiClient.post('/warranties', args),
@@ -429,7 +459,15 @@ class StateSetMCPClient {
     });
   }
 
-    async createShipment(args: CreateShipmentArgs): Promise<StateSetResponse> {
+  async updateWarranty(args: UpdateWarrantyArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/warranties/${args.warranty_id}`, args),
+      'updateWarranty'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async createShipment(args: CreateShipmentArgs): Promise<StateSetResponse> {
     const response = await this.rateLimiter.enqueue(
       () => this.apiClient.post('/shipments', args),
       'createShipment'
@@ -444,6 +482,14 @@ class StateSetMCPClient {
       updated_at: shipment.updated_at,
       url: `${this.baseUrl}/dashboard/shipments/${shipment.id}`,
     });
+  }
+
+  async updateShipment(args: UpdateShipmentArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/shipments/${args.shipment_id}`, args),
+      'updateShipment'
+    );
+    return this.enrichResponse(response.data);
   }
 
   async getRMA(rmaId: string): Promise<StateSetResponse> {
@@ -650,6 +696,30 @@ const CreateOrderArgsSchema = z.object({
   }).optional(),
 });
 
+const UpdateOrderArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+  status: z.string().optional(),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+    price: z.number().positive("Price must be positive"),
+  })).optional(),
+  shipping_address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }).optional(),
+  billing_address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }).optional(),
+});
+
 const CreateWarrantyArgsSchema = z.object({
   order_id: z.string().min(1, "Order ID is required"),
   customer_email: z.string().email("Invalid email format"),
@@ -658,6 +728,12 @@ const CreateWarrantyArgsSchema = z.object({
     serial_number: z.string().optional(),
     warranty_period_months: z.number().positive("Warranty period must be positive"),
   })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+const UpdateWarrantyArgsSchema = z.object({
+  warranty_id: z.string().min(1, "Warranty ID is required"),
+  status: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -677,6 +753,20 @@ const CreateShipmentArgsSchema = z.object({
     postal_code: z.string().min(5, "Postal code is required"),
     country: z.string().min(2, "Country is required"),
   }),
+});
+
+const UpdateShipmentArgsSchema = z.object({
+  shipment_id: z.string().min(1, "Shipment ID is required"),
+  carrier: z.string().optional(),
+  status: z.string().optional(),
+  tracking_number: z.string().optional(),
+  destination_address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }).optional(),
 });
 
 const CreateBillOfMaterialsArgsSchema = z.object({
@@ -838,16 +928,34 @@ const createOrderTool: Tool = {
   inputSchema: CreateOrderArgsSchema.shape as any,
 };
 
+const updateOrderTool: Tool = {
+  name: "stateset_update_order",
+  description: "Updates an order record",
+  inputSchema: UpdateOrderArgsSchema.shape as any,
+};
+
 const createWarrantyTool: Tool = {
   name: "stateset_create_warranty",
   description: "Creates a warranty record",
   inputSchema: CreateWarrantyArgsSchema.shape as any,
 };
 
+const updateWarrantyTool: Tool = {
+  name: "stateset_update_warranty",
+  description: "Updates a warranty record",
+  inputSchema: UpdateWarrantyArgsSchema.shape as any,
+};
+
 const createShipmentTool: Tool = {
   name: "stateset_create_shipment",
   description: "Creates a shipment record",
   inputSchema: CreateShipmentArgsSchema.shape as any,
+};
+
+const updateShipmentTool: Tool = {
+  name: "stateset_update_shipment",
+  description: "Updates a shipment record",
+  inputSchema: UpdateShipmentArgsSchema.shape as any,
 };
 
 const createBillOfMaterialsTool: Tool = {
@@ -1042,8 +1150,11 @@ Capabilities:
 - stateset_create_rma: Create returns
 - stateset_update_rma: Update returns
 - stateset_create_order: Create orders
+- stateset_update_order: Update orders
 - stateset_create_warranty: Register warranties
+- stateset_update_warranty: Update warranties
 - stateset_create_shipment: Manage shipments
+- stateset_update_shipment: Update shipments
 - stateset_create_bill_of_materials: Create bill of materials
 - stateset_update_bill_of_materials: Update bill of materials
 - stateset_create_work_order: Create work orders
@@ -1107,10 +1218,16 @@ async function main(): Promise<void> {
             return await client.updateRMA(UpdateRMAArgsSchema.parse(request.params.arguments));
           case "stateset_create_order":
             return await client.createOrder(CreateOrderArgsSchema.parse(request.params.arguments));
+          case "stateset_update_order":
+            return await client.updateOrder(UpdateOrderArgsSchema.parse(request.params.arguments));
           case "stateset_create_warranty":
             return await client.createWarranty(CreateWarrantyArgsSchema.parse(request.params.arguments));
+          case "stateset_update_warranty":
+            return await client.updateWarranty(UpdateWarrantyArgsSchema.parse(request.params.arguments));
           case "stateset_create_shipment":
             return await client.createShipment(CreateShipmentArgsSchema.parse(request.params.arguments));
+          case "stateset_update_shipment":
+            return await client.updateShipment(UpdateShipmentArgsSchema.parse(request.params.arguments));
           case "stateset_create_bill_of_materials":
             return await client.createBillOfMaterials(CreateBillOfMaterialsArgsSchema.parse(request.params.arguments));
           case "stateset_update_bill_of_materials":
@@ -1201,8 +1318,11 @@ async function main(): Promise<void> {
         createRMATool,
         updateRMATool,
         createOrderTool,
+        updateOrderTool,
         createWarrantyTool,
+        updateWarrantyTool,
         createShipmentTool,
+        updateShipmentTool,
         createBillOfMaterialsTool,
         updateBillOfMaterialsTool,
         createWorkOrderTool,
