@@ -883,10 +883,16 @@ Best practices:
 async function main(): Promise<void> {
   try {
     dotenv.config();
+    const env = z.object({
+      STATESET_API_KEY: z.string().min(1, 'STATESET_API_KEY is required'),
+      STATESET_BASE_URL: z.string().url().default('https://api.stateset.io/v1'),
+      REQUESTS_PER_HOUR: z.coerce.number().positive().default(1000),
+    }).parse(process.env);
+
     const config: Config = {
-      apiKey: process.env.STATESET_API_KEY || '',
-      baseUrl: process.env.STATESET_BASE_URL || 'https://api.stateset.io/v1',
-      requestsPerHour: parseInt(process.env.REQUESTS_PER_HOUR || '1000'),
+      apiKey: env.STATESET_API_KEY,
+      baseUrl: env.STATESET_BASE_URL,
+      requestsPerHour: env.REQUESTS_PER_HOUR,
     };
 
     const client = new StateSetMCPClient(config);

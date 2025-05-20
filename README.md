@@ -8,8 +8,12 @@ This server provides integration with StateSet's issue operations system through
 
 Ensure the following environment variables are set before running the server:
 
-- `STATESET_API_KEY` – your API key
-- `STATESET_BASE_URL` – base URL for the StateSet API
-- `REQUESTS_PER_HOUR` – rate limit for outgoing requests (default `1000`)
+- `STATESET_API_KEY` – your API key (required)
+- `STATESET_BASE_URL` – base URL for the StateSet API (defaults to `https://api.stateset.io/v1`)
+- `REQUESTS_PER_HOUR` – rate limit for outgoing requests (defaults to `1000`)
 
-Start the server with `node index.ts` or `ts-node index.ts`.
+Install dependencies with `npm install` and start the server using:
+
+```bash
+npm start
+```
