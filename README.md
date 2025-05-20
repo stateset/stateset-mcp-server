@@ -22,7 +22,7 @@ The server exposes a variety of MCP tools for creating, updating, deleting and r
 - `stateset_create_customer`, `stateset_update_customer`, `stateset_delete_customer`, `stateset_get_customer`
 - `stateset_list_rmas`, `stateset_list_orders`, `stateset_list_warranties`, `stateset_list_shipments`
 - `stateset_list_bill_of_materials`, `stateset_list_work_orders`, `stateset_list_manufacturer_orders`
-- `stateset_list_invoices`, `stateset_list_payments`, `stateset_list_products`, `stateset_list_inventories`, `stateset_list_customers`
+- `stateset_list_invoices`, `stateset_list_payments`, `stateset_list_products`, `stateset_list_inventories`, `stateset_list_customers`, `stateset_get_api_metrics`
 
 ## Usage
 

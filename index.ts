@@ -373,6 +373,8 @@ interface ListArgs {
   per_page?: number;
 }
 
+interface GetApiMetricsArgs {}
+
 // Rate Limiter
 class RateLimiter {
   private readonly requestsPerHour: number;
@@ -1028,6 +1030,10 @@ class StateSetMCPClient {
     );
     return this.enrichListResponse(response.data);
   }
+
+  getApiMetrics(): { apiMetrics: RateLimiterMetrics } {
+    return { apiMetrics: this.rateLimiter.getMetrics() };
+  }
 }
 
 // Zod Schemas
@@ -1401,6 +1407,8 @@ const ListArgsSchema = z.object({
   per_page: z.number().positive().optional(),
 });
 
+const GetApiMetricsArgsSchema = z.object({});
+
 
 // Tool Definitions
 const createRMATool: Tool = {
@@ -1763,6 +1771,12 @@ const listCustomersTool: Tool = {
   inputSchema: ListArgsSchema.shape as any,
 };
 
+const getApiMetricsTool: Tool = {
+  name: "stateset_get_api_metrics",
+  description: "Returns API rate limiter metrics",
+  inputSchema: GetApiMetricsArgsSchema.shape as any,
+};
+
 
 // Resource Templates
 const resourceTemplates: ResourceTemplate[] = [
@@ -2078,6 +2092,8 @@ async function main(): Promise<void> {
             return await client.listInventories(ListArgsSchema.parse(request.params.arguments));
           case "stateset_list_customers":
             return await client.listCustomers(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_get_api_metrics":
+            return client.getApiMetrics();
 
           default:
             throw new Error(`Unknown tool: ${request.params.name}`);
@@ -2196,6 +2212,7 @@ async function main(): Promise<void> {
         listProductsTool,
         listInventoriesTool,
         listCustomersTool,
+        getApiMetricsTool,
       ],
     }));
 
