@@ -109,6 +109,27 @@ interface PaymentItem {
   quantity: number;
 }
 
+interface CreateCustomerArgs {
+  email: string;
+  name: string;
+  address: Address;
+}
+
+interface UpdateCustomerArgs {
+  customer_id: string;
+  email?: string;
+  name?: string;
+  address?: Address;
+}
+
+interface DeleteCustomerArgs {
+  customer_id: string;
+}
+
+interface GetCustomerArgs {
+  customer_id: string;
+}
+
 
 interface CreateRMAArgs {
   order_id: string;
@@ -701,6 +722,46 @@ class StateSetMCPClient {
     return this.enrichResponse(response.data);
   }
 
+  async createCustomer(args: CreateCustomerArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.post('/customers', args),
+      'createCustomer'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async updateCustomer(args: UpdateCustomerArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/customers/${args.customer_id}`, args),
+      'updateCustomer'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deleteCustomer(args: DeleteCustomerArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/customers/${args.customer_id}`),
+      'deleteCustomer'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getCustomer(customerId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/customers/${customerId}`),
+      'getCustomer'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async listCustomers(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/customers', { params: args }),
+      'listCustomers'
+    );
+    return this.enrichListResponse(response.data);
+  }
+
   async deleteRMA(args: DeleteRMAArgs): Promise<StateSetResponse> {
     const response = await this.rateLimiter.enqueue(
       () => this.apiClient.delete(`/rmas/${args.rma_id}`),
@@ -1064,6 +1125,39 @@ const UpdatePaymentArgsSchema = z.object({
   notes: z.string().optional(),
 });
 
+const CreateCustomerArgsSchema = z.object({
+  email: z.string().email("Invalid email format"),
+  name: z.string().min(1, "Name is required"),
+  address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }),
+});
+
+const UpdateCustomerArgsSchema = z.object({
+  customer_id: z.string().min(1, "Customer ID is required"),
+  email: z.string().email("Invalid email format").optional(),
+  name: z.string().min(1, "Name is required").optional(),
+  address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }).optional(),
+});
+
+const DeleteCustomerArgsSchema = z.object({
+  customer_id: z.string().min(1, "Customer ID is required"),
+});
+
+const GetCustomerArgsSchema = z.object({
+  customer_id: z.string().min(1, "Customer ID is required"),
+});
+
 const DeleteRMAArgsSchema = z.object({
   rma_id: z.string().min(1, "RMA ID is required"),
 });
@@ -1251,6 +1345,18 @@ const updatePaymentTool: Tool = {
   inputSchema: UpdatePaymentArgsSchema.shape as any,
 };
 
+const createCustomerTool: Tool = {
+  name: "stateset_create_customer",
+  description: "Creates a customer record",
+  inputSchema: CreateCustomerArgsSchema.shape as any,
+};
+
+const updateCustomerTool: Tool = {
+  name: "stateset_update_customer",
+  description: "Updates a customer record",
+  inputSchema: UpdateCustomerArgsSchema.shape as any,
+};
+
 const deleteRMATool: Tool = {
   name: "stateset_delete_rma",
   description: "Deletes an RMA record",
@@ -1303,6 +1409,12 @@ const deletePaymentTool: Tool = {
   name: "stateset_delete_payment",
   description: "Deletes a payment record",
   inputSchema: DeletePaymentArgsSchema.shape as any,
+};
+
+const deleteCustomerTool: Tool = {
+  name: "stateset_delete_customer",
+  description: "Deletes a customer record",
+  inputSchema: DeleteCustomerArgsSchema.shape as any,
 };
 
 const getRMATool: Tool = {
@@ -1359,6 +1471,12 @@ const getPaymentTool: Tool = {
   inputSchema: GetPaymentArgsSchema.shape as any,
 };
 
+const getCustomerTool: Tool = {
+  name: "stateset_get_customer",
+  description: "Retrieves a customer record",
+  inputSchema: GetCustomerArgsSchema.shape as any,
+};
+
 const listRMAsTool: Tool = {
   name: "stateset_list_rmas",
   description: "Lists RMA records",
@@ -1410,6 +1528,12 @@ const listInvoicesTool: Tool = {
 const listPaymentsTool: Tool = {
   name: "stateset_list_payments",
   description: "Lists payment records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
+const listCustomersTool: Tool = {
+  name: "stateset_list_customers",
+  description: "Lists customer records",
   inputSchema: ListArgsSchema.shape as any,
 };
 
@@ -1479,6 +1603,13 @@ const resourceTemplates: ResourceTemplate[] = [
     parameters: { paymentId: { type: "string", description: "Payment ID" } },
     examples: ["stateset-payment:///PAY-123"],
   },
+  {
+    uriTemplate: "stateset-customer:///{customerId}",
+    name: "StateSet Customer",
+    description: "Customer record",
+    parameters: { customerId: { type: "string", description: "Customer ID" } },
+    examples: ["stateset-customer:///CUST-123"],
+  },
 ];
 
 // Server Prompt
@@ -1506,6 +1637,8 @@ Capabilities:
 - stateset_update_invoice: Update invoices
 - stateset_create_payment: Create payments
 - stateset_update_payment: Update payments
+- stateset_create_customer: Create customers
+- stateset_update_customer: Update customers
 - stateset_delete_rma: Delete returns
 - stateset_delete_order: Delete orders
 - stateset_delete_warranty: Delete warranties
@@ -1515,6 +1648,7 @@ Capabilities:
 - stateset_delete_manufacturer_order: Delete manufacturer orders
 - stateset_delete_invoice: Delete invoices
 - stateset_delete_payment: Delete payments
+- stateset_delete_customer: Delete customers
 - stateset_get_rma: Fetch RMA details
 - stateset_get_order: Fetch order details
 - stateset_get_warranty: Fetch warranty details
@@ -1524,6 +1658,7 @@ Capabilities:
 - stateset_get_manufacturer_order: Fetch manufacturer order details
 - stateset_get_invoice: Fetch invoice details
 - stateset_get_payment: Fetch payment details
+- stateset_get_customer: Fetch customer details
 - stateset_list_rmas: List RMAs
 - stateset_list_orders: List orders
 - stateset_list_warranties: List warranties
@@ -1533,6 +1668,7 @@ Capabilities:
 - stateset_list_manufacturer_orders: List manufacturer orders
 - stateset_list_invoices: List invoices
 - stateset_list_payments: List payments
+- stateset_list_customers: List customers
 
 Best practices:
 - Validate all IDs before use
@@ -1607,6 +1743,10 @@ async function main(): Promise<void> {
             return await client.createPayment(CreatePaymentArgsSchema.parse(request.params.arguments));
           case "stateset_update_payment":
             return await client.updatePayment(UpdatePaymentArgsSchema.parse(request.params.arguments));
+          case "stateset_create_customer":
+            return await client.createCustomer(CreateCustomerArgsSchema.parse(request.params.arguments));
+          case "stateset_update_customer":
+            return await client.updateCustomer(UpdateCustomerArgsSchema.parse(request.params.arguments));
           case "stateset_delete_rma":
             return await client.deleteRMA(DeleteRMAArgsSchema.parse(request.params.arguments));
           case "stateset_delete_order":
@@ -1625,6 +1765,8 @@ async function main(): Promise<void> {
             return await client.deleteInvoice(DeleteInvoiceArgsSchema.parse(request.params.arguments));
           case "stateset_delete_payment":
             return await client.deletePayment(DeletePaymentArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_customer":
+            return await client.deleteCustomer(DeleteCustomerArgsSchema.parse(request.params.arguments));
           case "stateset_get_rma":
             return await client.getRMA(GetRMAArgsSchema.parse(request.params.arguments).rma_id);
           case "stateset_get_order":
@@ -1643,6 +1785,8 @@ async function main(): Promise<void> {
             return await client.getInvoice(GetInvoiceArgsSchema.parse(request.params.arguments).invoice_id);
           case "stateset_get_payment":
             return await client.getPayment(GetPaymentArgsSchema.parse(request.params.arguments).payment_id);
+          case "stateset_get_customer":
+            return await client.getCustomer(GetCustomerArgsSchema.parse(request.params.arguments).customer_id);
 
           case "stateset_list_rmas":
             return await client.listRMAs(ListArgsSchema.parse(request.params.arguments));
@@ -1662,6 +1806,8 @@ async function main(): Promise<void> {
             return await client.listInvoices(ListArgsSchema.parse(request.params.arguments));
           case "stateset_list_payments":
             return await client.listPayments(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_list_customers":
+            return await client.listCustomers(ListArgsSchema.parse(request.params.arguments));
 
           default:
             throw new Error(`Unknown tool: ${request.params.name}`);
@@ -1704,6 +1850,9 @@ async function main(): Promise<void> {
         case 'stateset-payment:':
           const payment = await client.getPayment(path);
           return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(payment, null, 2) }] };
+        case 'stateset-customer:':
+          const customer = await client.getCustomer(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(customer, null, 2) }] };
         default:
           throw new Error(`Unsupported URI: ${request.params.uri}`);
       }
@@ -1729,6 +1878,8 @@ async function main(): Promise<void> {
         updateInvoiceTool,
         createPaymentTool,
         updatePaymentTool,
+        createCustomerTool,
+        updateCustomerTool,
         deleteRMATool,
         deleteOrderTool,
         deleteWarrantyTool,
@@ -1738,6 +1889,7 @@ async function main(): Promise<void> {
         deleteManufacturerOrderTool,
         deleteInvoiceTool,
         deletePaymentTool,
+        deleteCustomerTool,
         getRMATool,
         getOrderTool,
         getWarrantyTool,
@@ -1747,6 +1899,7 @@ async function main(): Promise<void> {
         getManufacturerOrderTool,
         getInvoiceTool,
         getPaymentTool,
+        getCustomerTool,
         listRMAsTool,
         listOrdersTool,
         listWarrantiesTool,
@@ -1756,6 +1909,7 @@ async function main(): Promise<void> {
         listManufacturerOrdersTool,
         listInvoicesTool,
         listPaymentsTool,
+        listCustomersTool,
       ],
     }));
 
