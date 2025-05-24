@@ -2439,89 +2439,40 @@ const resourceTemplates: ResourceTemplate[] = [
 const serverPrompt: Prompt = {
   name: "stateset-server-prompt",
   description: "StateSet MCP server instructions",
-  instructions: `Manages RMAs, orders, warranties, shipments, and other related tasks.
+  instructions: `Manages eCommerce operations for StateSet.
 
-Capabilities:
-- stateset_create_rma: Create returns
-- stateset_update_rma: Update returns
-- stateset_create_order: Create orders
-- stateset_update_order: Update orders
-- stateset_create_warranty: Register warranties
-- stateset_update_warranty: Update warranties
-- stateset_create_shipment: Manage shipments
-- stateset_update_shipment: Update shipments
-- stateset_create_bill_of_materials: Create bill of materials
-- stateset_update_bill_of_materials: Update bill of materials
-- stateset_create_work_order: Create work orders
-- stateset_update_work_order: Update work orders
-- stateset_create_manufacturer_order: Create manufacturer orders
-- stateset_update_manufacturer_order: Update manufacturer orders
-- stateset_create_invoice: Create invoices
-- stateset_update_invoice: Update invoices
-- stateset_create_payment: Create payments
-- stateset_update_payment: Update payments
-- stateset_create_sales_order: Create sales orders
-- stateset_update_sales_order: Update sales orders
-- stateset_create_fulfillment_order: Create fulfillment orders
-- stateset_update_fulfillment_order: Update fulfillment orders
-- stateset_create_item_receipt: Create item receipts
-- stateset_update_item_receipt: Update item receipts
-- stateset_create_cash_sale: Create cash sales
-- stateset_update_cash_sale: Update cash sales
- - stateset_create_product: Create products
-- stateset_update_product: Update products
-- stateset_create_inventory: Create inventory records
-- stateset_update_inventory: Update inventory records
-- stateset_create_customer: Create customers
-- stateset_update_customer: Update customers
-- stateset_delete_rma: Delete returns
-- stateset_delete_order: Delete orders
-- stateset_delete_sales_order: Delete sales orders
- - stateset_delete_warranty: Delete warranties
- - stateset_delete_shipment: Delete shipments
-- stateset_delete_fulfillment_order: Delete fulfillment orders
-- stateset_delete_item_receipt: Delete item receipts
-- stateset_delete_cash_sale: Delete cash sales
- - stateset_delete_bill_of_materials: Delete bill of materials
-- stateset_delete_work_order: Delete work orders
-- stateset_delete_manufacturer_order: Delete manufacturer orders
-- stateset_delete_invoice: Delete invoices
-- stateset_delete_payment: Delete payments
-- stateset_delete_product: Delete products
-- stateset_delete_inventory: Delete inventory records
-- stateset_delete_customer: Delete customers
-- stateset_get_rma: Fetch RMA details
-- stateset_get_order: Fetch order details
-- stateset_get_warranty: Fetch warranty details
-- stateset_get_shipment: Fetch shipment details
-- stateset_get_bill_of_materials: Fetch bill of materials details
-- stateset_get_work_order: Fetch work order details
-- stateset_get_manufacturer_order: Fetch manufacturer order details
-- stateset_get_invoice: Fetch invoice details
-- stateset_get_payment: Fetch payment details
-- stateset_get_sales_order: Fetch sales order details
-- stateset_get_fulfillment_order: Fetch fulfillment order details
-- stateset_get_item_receipt: Fetch item receipt details
-- stateset_get_cash_sale: Fetch cash sale details
- - stateset_get_product: Fetch product details
-- stateset_get_inventory: Fetch inventory details
-- stateset_get_customer: Fetch customer details
-- stateset_list_rmas: List RMAs
-- stateset_list_orders: List orders
-- stateset_list_sales_orders: List sales orders
- - stateset_list_warranties: List warranties
- - stateset_list_shipments: List shipments
-- stateset_list_fulfillment_orders: List fulfillment orders
-- stateset_list_item_receipts: List item receipts
-- stateset_list_cash_sales: List cash sales
- - stateset_list_bill_of_materials: List bill of materials
-- stateset_list_work_orders: List work orders
-- stateset_list_manufacturer_orders: List manufacturer orders
-- stateset_list_invoices: List invoices
-- stateset_list_payments: List payments
-- stateset_list_products: List products
-- stateset_list_inventories: List inventory records
-- stateset_list_customers: List customers
+Capabilities are grouped by domain:
+
+Orders & Returns
+- stateset_create_order / stateset_update_order / stateset_delete_order / stateset_get_order
+- stateset_create_sales_order / stateset_update_sales_order / stateset_delete_sales_order / stateset_get_sales_order
+- stateset_create_rma / stateset_update_rma / stateset_delete_rma / stateset_get_rma
+
+Fulfillment & Production
+- stateset_create_shipment / stateset_update_shipment / stateset_delete_shipment / stateset_get_shipment
+- stateset_create_fulfillment_order / stateset_update_fulfillment_order / stateset_delete_fulfillment_order / stateset_get_fulfillment_order
+- stateset_create_item_receipt / stateset_update_item_receipt / stateset_delete_item_receipt / stateset_get_item_receipt
+- stateset_create_bill_of_materials / stateset_update_bill_of_materials / stateset_delete_bill_of_materials / stateset_get_bill_of_materials
+- stateset_create_work_order / stateset_update_work_order / stateset_delete_work_order / stateset_get_work_order
+- stateset_create_manufacturer_order / stateset_update_manufacturer_order / stateset_delete_manufacturer_order / stateset_get_manufacturer_order
+
+Inventory & Products
+- stateset_create_product / stateset_update_product / stateset_delete_product / stateset_get_product
+- stateset_create_inventory / stateset_update_inventory / stateset_delete_inventory / stateset_get_inventory
+
+Financial
+- stateset_create_invoice / stateset_update_invoice / stateset_delete_invoice / stateset_get_invoice
+- stateset_create_payment / stateset_update_payment / stateset_delete_payment / stateset_get_payment
+- stateset_create_cash_sale / stateset_update_cash_sale / stateset_delete_cash_sale / stateset_get_cash_sale
+
+Customers
+- stateset_create_customer / stateset_update_customer / stateset_delete_customer / stateset_get_customer
+
+Listing
+- stateset_list_rmas / stateset_list_orders / stateset_list_sales_orders / stateset_list_warranties
+- stateset_list_shipments / stateset_list_fulfillment_orders / stateset_list_item_receipts / stateset_list_cash_sales
+- stateset_list_bill_of_materials / stateset_list_work_orders / stateset_list_manufacturer_orders
+- stateset_list_invoices / stateset_list_payments / stateset_list_products / stateset_list_inventories / stateset_list_customers
 
 Best practices:
 - Validate all IDs before use
