@@ -109,6 +109,18 @@ interface PaymentItem {
   quantity: number;
 }
 
+interface PurchaseOrderItem {
+  item_id: string;
+  quantity: number;
+  price: number;
+}
+
+interface ASNItem {
+  item_id: string;
+  quantity: number;
+  tracking_number?: string;
+}
+
 interface SalesOrderItem {
   item_id: string;
   quantity: number;
@@ -246,8 +258,54 @@ interface CreateManufacturerOrderArgs {
 
 interface UpdateManufacturerOrderArgs {
   manufacturer_order_id: string;
-  items: ManufacturerOrderItem[];   
+  items: ManufacturerOrderItem[];
   notes?: string;
+}
+
+interface CreatePurchaseOrderArgs {
+  vendor_email: string;
+  items: PurchaseOrderItem[];
+  shipping_address: Address;
+  billing_address?: Address;
+}
+
+interface UpdatePurchaseOrderArgs {
+  purchase_order_id: string;
+  status?: string;
+  items?: PurchaseOrderItem[];
+  shipping_address?: Address;
+  billing_address?: Address;
+}
+
+interface DeletePurchaseOrderArgs {
+  purchase_order_id: string;
+}
+
+interface GetPurchaseOrderArgs {
+  purchase_order_id: string;
+}
+
+interface CreateASNArgs {
+  purchase_order_id: string;
+  items: ASNItem[];
+  carrier: string;
+  destination_address: Address;
+}
+
+interface UpdateASNArgs {
+  asn_id: string;
+  carrier?: string;
+  status?: string;
+  tracking_number?: string;
+  destination_address?: Address;
+}
+
+interface DeleteASNArgs {
+  asn_id: string;
+}
+
+interface GetASNArgs {
+  asn_id: string;
 }
 
 interface CreateInvoiceArgs {
@@ -844,6 +902,86 @@ class StateSetMCPClient {
       'updateManufacturerOrder'
     );
     return this.enrichResponse(response.data);
+  }
+
+  async createPurchaseOrder(args: CreatePurchaseOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.post('/purchase-orders', args),
+      'createPurchaseOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async updatePurchaseOrder(args: UpdatePurchaseOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/purchase-orders/${args.purchase_order_id}`, args),
+      'updatePurchaseOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deletePurchaseOrder(args: DeletePurchaseOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/purchase-orders/${args.purchase_order_id}`),
+      'deletePurchaseOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getPurchaseOrder(purchaseOrderId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/purchase-orders/${purchaseOrderId}`),
+      'getPurchaseOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async listPurchaseOrders(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/purchase-orders', { params: args }),
+      'listPurchaseOrders'
+    );
+    return this.enrichListResponse(response.data);
+  }
+
+  async createASN(args: CreateASNArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.post('/asns', args),
+      'createASN'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async updateASN(args: UpdateASNArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/asns/${args.asn_id}`, args),
+      'updateASN'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deleteASN(args: DeleteASNArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/asns/${args.asn_id}`),
+      'deleteASN'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getASN(asnId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/asns/${asnId}`),
+      'getASN'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async listASNs(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/asns', { params: args }),
+      'listASNs'
+    );
+    return this.enrichListResponse(response.data);
   }
 
   async createInvoice(args: CreateInvoiceArgs): Promise<StateSetResponse> {
@@ -1483,6 +1621,100 @@ const UpdateManufacturerOrderArgsSchema = z.object({
   notes: z.string().optional(),
 });
 
+const CreatePurchaseOrderArgsSchema = z.object({
+  vendor_email: z.string().email("Invalid email format"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+    price: z.number().positive("Price must be positive"),
+  })).min(1, "At least one item is required"),
+  shipping_address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }),
+  billing_address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }).optional(),
+});
+
+const UpdatePurchaseOrderArgsSchema = z.object({
+  purchase_order_id: z.string().min(1, "Purchase Order ID is required"),
+  status: z.string().optional(),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+    price: z.number().positive("Price must be positive"),
+  })).optional(),
+  shipping_address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }).optional(),
+  billing_address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }).optional(),
+});
+
+const DeletePurchaseOrderArgsSchema = z.object({
+  purchase_order_id: z.string().min(1, "Purchase Order ID is required"),
+});
+
+const GetPurchaseOrderArgsSchema = z.object({
+  purchase_order_id: z.string().min(1, "Purchase Order ID is required"),
+});
+
+const CreateASNArgsSchema = z.object({
+  purchase_order_id: z.string().min(1, "Purchase Order ID is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+    tracking_number: z.string().optional(),
+  })).min(1, "At least one item is required"),
+  carrier: z.string().min(1, "Carrier is required"),
+  destination_address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }),
+});
+
+const UpdateASNArgsSchema = z.object({
+  asn_id: z.string().min(1, "ASN ID is required"),
+  carrier: z.string().optional(),
+  status: z.string().optional(),
+  tracking_number: z.string().optional(),
+  destination_address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }).optional(),
+});
+
+const DeleteASNArgsSchema = z.object({
+  asn_id: z.string().min(1, "ASN ID is required"),
+});
+
+const GetASNArgsSchema = z.object({
+  asn_id: z.string().min(1, "ASN ID is required"),
+});
+
 const CreateInvoiceArgsSchema = z.object({
   order_id: z.string().min(1, "Order ID is required"),
   customer_email: z.string().email("Invalid email format"),
@@ -1914,6 +2146,66 @@ const updateManufacturerOrderTool: Tool = {
   name: "stateset_update_manufacturer_order",
   description: "Updates a manufacturer order record",
   inputSchema: UpdateManufacturerOrderArgsSchema.shape as any,
+};
+
+const createPurchaseOrderTool: Tool = {
+  name: "stateset_create_purchase_order",
+  description: "Creates a purchase order record",
+  inputSchema: CreatePurchaseOrderArgsSchema.shape as any,
+};
+
+const updatePurchaseOrderTool: Tool = {
+  name: "stateset_update_purchase_order",
+  description: "Updates a purchase order record",
+  inputSchema: UpdatePurchaseOrderArgsSchema.shape as any,
+};
+
+const deletePurchaseOrderTool: Tool = {
+  name: "stateset_delete_purchase_order",
+  description: "Deletes a purchase order record",
+  inputSchema: DeletePurchaseOrderArgsSchema.shape as any,
+};
+
+const getPurchaseOrderTool: Tool = {
+  name: "stateset_get_purchase_order",
+  description: "Retrieves a purchase order record",
+  inputSchema: GetPurchaseOrderArgsSchema.shape as any,
+};
+
+const listPurchaseOrdersTool: Tool = {
+  name: "stateset_list_purchase_orders",
+  description: "Lists purchase order records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
+const createASNTool: Tool = {
+  name: "stateset_create_asn",
+  description: "Creates an ASN record",
+  inputSchema: CreateASNArgsSchema.shape as any,
+};
+
+const updateASNTool: Tool = {
+  name: "stateset_update_asn",
+  description: "Updates an ASN record",
+  inputSchema: UpdateASNArgsSchema.shape as any,
+};
+
+const deleteASNTool: Tool = {
+  name: "stateset_delete_asn",
+  description: "Deletes an ASN record",
+  inputSchema: DeleteASNArgsSchema.shape as any,
+};
+
+const getASNTool: Tool = {
+  name: "stateset_get_asn",
+  description: "Retrieves an ASN record",
+  inputSchema: GetASNArgsSchema.shape as any,
+};
+
+const listASNsTool: Tool = {
+  name: "stateset_list_asns",
+  description: "Lists ASN records",
+  inputSchema: ListArgsSchema.shape as any,
 };
 
 const createInvoiceTool: Tool = {
@@ -2371,6 +2663,20 @@ const resourceTemplates: ResourceTemplate[] = [
     examples: ["stateset-manufacturer-order:///MO-123"],
   },
   {
+    uriTemplate: "stateset-purchase-order:///{purchaseOrderId}",
+    name: "StateSet Purchase Order",
+    description: "Purchase Order record",
+    parameters: { purchaseOrderId: { type: "string", description: "Purchase Order ID" } },
+    examples: ["stateset-purchase-order:///PO-123"],
+  },
+  {
+    uriTemplate: "stateset-asn:///{asnId}",
+    name: "StateSet ASN",
+    description: "Advanced Shipping Notice record",
+    parameters: { asnId: { type: "string", description: "ASN ID" } },
+    examples: ["stateset-asn:///ASN-123"],
+  },
+  {
     uriTemplate: "stateset-invoice:///{invoiceId}",
     name: "StateSet Invoice",
     description: "Invoice record",
@@ -2439,89 +2745,43 @@ const resourceTemplates: ResourceTemplate[] = [
 const serverPrompt: Prompt = {
   name: "stateset-server-prompt",
   description: "StateSet MCP server instructions",
-  instructions: `Manages RMAs, orders, warranties, shipments, and other related tasks.
+  instructions: `Manages eCommerce operations for StateSet.
 
-Capabilities:
-- stateset_create_rma: Create returns
-- stateset_update_rma: Update returns
-- stateset_create_order: Create orders
-- stateset_update_order: Update orders
-- stateset_create_warranty: Register warranties
-- stateset_update_warranty: Update warranties
-- stateset_create_shipment: Manage shipments
-- stateset_update_shipment: Update shipments
-- stateset_create_bill_of_materials: Create bill of materials
-- stateset_update_bill_of_materials: Update bill of materials
-- stateset_create_work_order: Create work orders
-- stateset_update_work_order: Update work orders
-- stateset_create_manufacturer_order: Create manufacturer orders
-- stateset_update_manufacturer_order: Update manufacturer orders
-- stateset_create_invoice: Create invoices
-- stateset_update_invoice: Update invoices
-- stateset_create_payment: Create payments
-- stateset_update_payment: Update payments
-- stateset_create_sales_order: Create sales orders
-- stateset_update_sales_order: Update sales orders
-- stateset_create_fulfillment_order: Create fulfillment orders
-- stateset_update_fulfillment_order: Update fulfillment orders
-- stateset_create_item_receipt: Create item receipts
-- stateset_update_item_receipt: Update item receipts
-- stateset_create_cash_sale: Create cash sales
-- stateset_update_cash_sale: Update cash sales
- - stateset_create_product: Create products
-- stateset_update_product: Update products
-- stateset_create_inventory: Create inventory records
-- stateset_update_inventory: Update inventory records
-- stateset_create_customer: Create customers
-- stateset_update_customer: Update customers
-- stateset_delete_rma: Delete returns
-- stateset_delete_order: Delete orders
-- stateset_delete_sales_order: Delete sales orders
- - stateset_delete_warranty: Delete warranties
- - stateset_delete_shipment: Delete shipments
-- stateset_delete_fulfillment_order: Delete fulfillment orders
-- stateset_delete_item_receipt: Delete item receipts
-- stateset_delete_cash_sale: Delete cash sales
- - stateset_delete_bill_of_materials: Delete bill of materials
-- stateset_delete_work_order: Delete work orders
-- stateset_delete_manufacturer_order: Delete manufacturer orders
-- stateset_delete_invoice: Delete invoices
-- stateset_delete_payment: Delete payments
-- stateset_delete_product: Delete products
-- stateset_delete_inventory: Delete inventory records
-- stateset_delete_customer: Delete customers
-- stateset_get_rma: Fetch RMA details
-- stateset_get_order: Fetch order details
-- stateset_get_warranty: Fetch warranty details
-- stateset_get_shipment: Fetch shipment details
-- stateset_get_bill_of_materials: Fetch bill of materials details
-- stateset_get_work_order: Fetch work order details
-- stateset_get_manufacturer_order: Fetch manufacturer order details
-- stateset_get_invoice: Fetch invoice details
-- stateset_get_payment: Fetch payment details
-- stateset_get_sales_order: Fetch sales order details
-- stateset_get_fulfillment_order: Fetch fulfillment order details
-- stateset_get_item_receipt: Fetch item receipt details
-- stateset_get_cash_sale: Fetch cash sale details
- - stateset_get_product: Fetch product details
-- stateset_get_inventory: Fetch inventory details
-- stateset_get_customer: Fetch customer details
-- stateset_list_rmas: List RMAs
-- stateset_list_orders: List orders
-- stateset_list_sales_orders: List sales orders
- - stateset_list_warranties: List warranties
- - stateset_list_shipments: List shipments
-- stateset_list_fulfillment_orders: List fulfillment orders
-- stateset_list_item_receipts: List item receipts
-- stateset_list_cash_sales: List cash sales
- - stateset_list_bill_of_materials: List bill of materials
-- stateset_list_work_orders: List work orders
-- stateset_list_manufacturer_orders: List manufacturer orders
-- stateset_list_invoices: List invoices
-- stateset_list_payments: List payments
-- stateset_list_products: List products
-- stateset_list_inventories: List inventory records
-- stateset_list_customers: List customers
+Capabilities are grouped by domain:
+
+Orders & Returns
+- stateset_create_order / stateset_update_order / stateset_delete_order / stateset_get_order
+- stateset_create_sales_order / stateset_update_sales_order / stateset_delete_sales_order / stateset_get_sales_order
+- stateset_create_rma / stateset_update_rma / stateset_delete_rma / stateset_get_rma
+- stateset_create_purchase_order / stateset_update_purchase_order / stateset_delete_purchase_order / stateset_get_purchase_order
+
+Fulfillment & Production
+- stateset_create_shipment / stateset_update_shipment / stateset_delete_shipment / stateset_get_shipment
+- stateset_create_fulfillment_order / stateset_update_fulfillment_order / stateset_delete_fulfillment_order / stateset_get_fulfillment_order
+- stateset_create_item_receipt / stateset_update_item_receipt / stateset_delete_item_receipt / stateset_get_item_receipt
+- stateset_create_bill_of_materials / stateset_update_bill_of_materials / stateset_delete_bill_of_materials / stateset_get_bill_of_materials
+- stateset_create_work_order / stateset_update_work_order / stateset_delete_work_order / stateset_get_work_order
+- stateset_create_manufacturer_order / stateset_update_manufacturer_order / stateset_delete_manufacturer_order / stateset_get_manufacturer_order
+- stateset_create_asn / stateset_update_asn / stateset_delete_asn / stateset_get_asn
+
+Inventory & Products
+- stateset_create_product / stateset_update_product / stateset_delete_product / stateset_get_product
+- stateset_create_inventory / stateset_update_inventory / stateset_delete_inventory / stateset_get_inventory
+
+Financial
+- stateset_create_invoice / stateset_update_invoice / stateset_delete_invoice / stateset_get_invoice
+- stateset_create_payment / stateset_update_payment / stateset_delete_payment / stateset_get_payment
+- stateset_create_cash_sale / stateset_update_cash_sale / stateset_delete_cash_sale / stateset_get_cash_sale
+
+Customers
+- stateset_create_customer / stateset_update_customer / stateset_delete_customer / stateset_get_customer
+
+Listing
+- stateset_list_rmas / stateset_list_orders / stateset_list_sales_orders / stateset_list_warranties
+- stateset_list_shipments / stateset_list_fulfillment_orders / stateset_list_item_receipts / stateset_list_cash_sales
+- stateset_list_bill_of_materials / stateset_list_work_orders / stateset_list_manufacturer_orders
+- stateset_list_purchase_orders / stateset_list_asns / stateset_list_bill_of_materials / stateset_list_work_orders / stateset_list_manufacturer_orders
+- stateset_list_invoices / stateset_list_payments / stateset_list_products / stateset_list_inventories / stateset_list_customers
 
 Best practices:
 - Validate all IDs before use
@@ -2586,10 +2846,30 @@ async function main(): Promise<void> {
             return await client.updateWorkOrder(UpdateWorkOrderArgsSchema.parse(request.params.arguments));
           case "stateset_create_manufacturer_order":
             return await client.createManufacturerOrder(CreateManufacturerOrderArgsSchema.parse(request.params.arguments));
-          case "stateset_update_manufacturer_order":
-            return await client.updateManufacturerOrder(UpdateManufacturerOrderArgsSchema.parse(request.params.arguments));
-          case "stateset_create_invoice":
-            return await client.createInvoice(CreateInvoiceArgsSchema.parse(request.params.arguments));
+        case "stateset_update_manufacturer_order":
+          return await client.updateManufacturerOrder(UpdateManufacturerOrderArgsSchema.parse(request.params.arguments));
+        case "stateset_create_purchase_order":
+          return await client.createPurchaseOrder(CreatePurchaseOrderArgsSchema.parse(request.params.arguments));
+        case "stateset_update_purchase_order":
+          return await client.updatePurchaseOrder(UpdatePurchaseOrderArgsSchema.parse(request.params.arguments));
+        case "stateset_delete_purchase_order":
+          return await client.deletePurchaseOrder(DeletePurchaseOrderArgsSchema.parse(request.params.arguments));
+        case "stateset_get_purchase_order":
+          return await client.getPurchaseOrder(GetPurchaseOrderArgsSchema.parse(request.params.arguments).purchase_order_id);
+        case "stateset_list_purchase_orders":
+          return await client.listPurchaseOrders(ListArgsSchema.parse(request.params.arguments));
+        case "stateset_create_asn":
+          return await client.createASN(CreateASNArgsSchema.parse(request.params.arguments));
+        case "stateset_update_asn":
+          return await client.updateASN(UpdateASNArgsSchema.parse(request.params.arguments));
+        case "stateset_delete_asn":
+          return await client.deleteASN(DeleteASNArgsSchema.parse(request.params.arguments));
+        case "stateset_get_asn":
+          return await client.getASN(GetASNArgsSchema.parse(request.params.arguments).asn_id);
+        case "stateset_list_asns":
+          return await client.listASNs(ListArgsSchema.parse(request.params.arguments));
+        case "stateset_create_invoice":
+          return await client.createInvoice(CreateInvoiceArgsSchema.parse(request.params.arguments));
           case "stateset_update_invoice":
             return await client.updateInvoice(UpdateInvoiceArgsSchema.parse(request.params.arguments));
           case "stateset_create_payment":
@@ -2759,6 +3039,12 @@ async function main(): Promise<void> {
         case 'stateset-manufacturer-order:':
           const mo = await client.getManufacturerOrder(path);
           return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(mo, null, 2) }] };
+        case 'stateset-purchase-order:':
+          const po = await client.getPurchaseOrder(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(po, null, 2) }] };
+        case 'stateset-asn:':
+          const asn = await client.getASN(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(asn, null, 2) }] };
         case 'stateset-invoice:':
           const invoice = await client.getInvoice(path);
           return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(invoice, null, 2) }] };
@@ -2807,6 +3093,10 @@ async function main(): Promise<void> {
         updateWorkOrderTool,
         createManufacturerOrderTool,
         updateManufacturerOrderTool,
+        createPurchaseOrderTool,
+        updatePurchaseOrderTool,
+        createASNTool,
+        updateASNTool,
         createInvoiceTool,
         updateInvoiceTool,
         createPaymentTool,
@@ -2833,6 +3123,8 @@ async function main(): Promise<void> {
         deleteBillOfMaterialsTool,
         deleteWorkOrderTool,
         deleteManufacturerOrderTool,
+        deletePurchaseOrderTool,
+        deleteASNTool,
         deleteInvoiceTool,
         deletePaymentTool,
         deleteFulfillmentOrderTool,
@@ -2852,6 +3144,8 @@ async function main(): Promise<void> {
         getBillOfMaterialsTool,
         getWorkOrderTool,
         getManufacturerOrderTool,
+        getPurchaseOrderTool,
+        getASNTool,
         getInvoiceTool,
         getPaymentTool,
         getProductTool,
@@ -2868,6 +3162,8 @@ async function main(): Promise<void> {
         listBillOfMaterialsTool,
         listWorkOrdersTool,
         listManufacturerOrdersTool,
+        listPurchaseOrdersTool,
+        listASNsTool,
         listInvoicesTool,
         listPaymentsTool,
         listProductsTool,
