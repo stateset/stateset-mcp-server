@@ -2753,7 +2753,6 @@ Orders & Returns
 - stateset_create_order / stateset_update_order / stateset_delete_order / stateset_get_order
 - stateset_create_sales_order / stateset_update_sales_order / stateset_delete_sales_order / stateset_get_sales_order
 - stateset_create_rma / stateset_update_rma / stateset_delete_rma / stateset_get_rma
-- stateset_create_purchase_order / stateset_update_purchase_order / stateset_delete_purchase_order / stateset_get_purchase_order
 
 Fulfillment & Production
 - stateset_create_shipment / stateset_update_shipment / stateset_delete_shipment / stateset_get_shipment
@@ -2762,7 +2761,6 @@ Fulfillment & Production
 - stateset_create_bill_of_materials / stateset_update_bill_of_materials / stateset_delete_bill_of_materials / stateset_get_bill_of_materials
 - stateset_create_work_order / stateset_update_work_order / stateset_delete_work_order / stateset_get_work_order
 - stateset_create_manufacturer_order / stateset_update_manufacturer_order / stateset_delete_manufacturer_order / stateset_get_manufacturer_order
-- stateset_create_asn / stateset_update_asn / stateset_delete_asn / stateset_get_asn
 
 Inventory & Products
 - stateset_create_product / stateset_update_product / stateset_delete_product / stateset_get_product
@@ -2780,7 +2778,6 @@ Listing
 - stateset_list_rmas / stateset_list_orders / stateset_list_sales_orders / stateset_list_warranties
 - stateset_list_shipments / stateset_list_fulfillment_orders / stateset_list_item_receipts / stateset_list_cash_sales
 - stateset_list_bill_of_materials / stateset_list_work_orders / stateset_list_manufacturer_orders
-- stateset_list_purchase_orders / stateset_list_asns / stateset_list_bill_of_materials / stateset_list_work_orders / stateset_list_manufacturer_orders
 - stateset_list_invoices / stateset_list_payments / stateset_list_products / stateset_list_inventories / stateset_list_customers
 
 Best practices:
