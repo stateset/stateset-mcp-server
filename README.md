@@ -25,6 +25,10 @@ The server exposes a comprehensive set of MCP tools grouped by domain.
 - `stateset_create_product`, `stateset_update_product`, `stateset_delete_product`, `stateset_get_product`
 - `stateset_create_inventory`, `stateset_update_inventory`, `stateset_delete_inventory`, `stateset_get_inventory`
 
+### Purchasing & Vendors
+- `stateset_create_purchase_order`, `stateset_update_purchase_order`, `stateset_delete_purchase_order`, `stateset_get_purchase_order`
+- `stateset_create_vendor`, `stateset_update_vendor`, `stateset_delete_vendor`, `stateset_get_vendor`
+
 ### Financial
 - `stateset_create_invoice`, `stateset_update_invoice`, `stateset_delete_invoice`, `stateset_get_invoice`
 - `stateset_create_payment`, `stateset_update_payment`, `stateset_delete_payment`, `stateset_get_payment`
@@ -36,7 +40,7 @@ The server exposes a comprehensive set of MCP tools grouped by domain.
 ### Listing Operations
 - `stateset_list_rmas`, `stateset_list_orders`, `stateset_list_sales_orders`, `stateset_list_warranties`, `stateset_list_shipments`, `stateset_list_fulfillment_orders`, `stateset_list_item_receipts`, `stateset_list_cash_sales`
 - `stateset_list_bill_of_materials`, `stateset_list_work_orders`, `stateset_list_manufacturer_orders`
-- `stateset_list_invoices`, `stateset_list_payments`, `stateset_list_products`, `stateset_list_inventories`, `stateset_list_customers`, `stateset_get_api_metrics`
+- `stateset_list_invoices`, `stateset_list_payments`, `stateset_list_products`, `stateset_list_inventories`, `stateset_list_customers`, `stateset_list_purchase_orders`, `stateset_list_vendors`, `stateset_get_api_metrics`
 
 ## Usage
 

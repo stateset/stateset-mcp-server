@@ -479,6 +479,53 @@ interface GetInventoryArgs {
   inventory_id: string;
 }
 
+interface PurchaseOrderItem {
+  item_id: string;
+  quantity: number;
+  price: number;
+}
+
+interface CreatePurchaseOrderArgs {
+  vendor_id: string;
+  items: PurchaseOrderItem[];
+  notes?: string;
+}
+
+interface UpdatePurchaseOrderArgs {
+  purchase_order_id: string;
+  items?: PurchaseOrderItem[];
+  notes?: string;
+}
+
+interface DeletePurchaseOrderArgs {
+  purchase_order_id: string;
+}
+
+interface GetPurchaseOrderArgs {
+  purchase_order_id: string;
+}
+
+interface CreateVendorArgs {
+  email: string;
+  name: string;
+  address: Address;
+}
+
+interface UpdateVendorArgs {
+  vendor_id: string;
+  email?: string;
+  name?: string;
+  address?: Address;
+}
+
+interface DeleteVendorArgs {
+  vendor_id: string;
+}
+
+interface GetVendorArgs {
+  vendor_id: string;
+}
+
 interface ListArgs {
   page?: number;
   per_page?: number;
@@ -1302,6 +1349,86 @@ class StateSetMCPClient {
     return this.enrichListResponse(response.data);
   }
 
+  async createPurchaseOrder(args: CreatePurchaseOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.post('/purchase-orders', args),
+      'createPurchaseOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async updatePurchaseOrder(args: UpdatePurchaseOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/purchase-orders/${args.purchase_order_id}`, args),
+      'updatePurchaseOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deletePurchaseOrder(args: DeletePurchaseOrderArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/purchase-orders/${args.purchase_order_id}`),
+      'deletePurchaseOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getPurchaseOrder(purchaseOrderId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/purchase-orders/${purchaseOrderId}`),
+      'getPurchaseOrder'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async listPurchaseOrders(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/purchase-orders', { params: args }),
+      'listPurchaseOrders'
+    );
+    return this.enrichListResponse(response.data);
+  }
+
+  async createVendor(args: CreateVendorArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.post('/vendors', args),
+      'createVendor'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async updateVendor(args: UpdateVendorArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.patch(`/vendors/${args.vendor_id}`, args),
+      'updateVendor'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async deleteVendor(args: DeleteVendorArgs): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.delete(`/vendors/${args.vendor_id}`),
+      'deleteVendor'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async getVendor(vendorId: string): Promise<StateSetResponse> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get(`/vendors/${vendorId}`),
+      'getVendor'
+    );
+    return this.enrichResponse(response.data);
+  }
+
+  async listVendors(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
+    const response = await this.rateLimiter.enqueue(
+      () => this.apiClient.get('/vendors', { params: args }),
+      'listVendors'
+    );
+    return this.enrichListResponse(response.data);
+  }
+
   getApiMetrics(): { apiMetrics: RateLimiterMetrics } {
     return { apiMetrics: this.rateLimiter.getMetrics() };
   }
@@ -1823,6 +1950,65 @@ const GetInventoryArgsSchema = z.object({
   inventory_id: z.string().min(1, "Inventory ID is required"),
 });
 
+const PurchaseOrderItemSchema = z.object({
+  item_id: z.string().min(1, "Item ID is required"),
+  quantity: z.number().positive("Quantity must be positive"),
+  price: z.number().positive("Price must be positive"),
+});
+
+const CreatePurchaseOrderArgsSchema = z.object({
+  vendor_id: z.string().min(1, "Vendor ID is required"),
+  items: z.array(PurchaseOrderItemSchema).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+const UpdatePurchaseOrderArgsSchema = z.object({
+  purchase_order_id: z.string().min(1, "Purchase Order ID is required"),
+  items: z.array(PurchaseOrderItemSchema).min(1, "At least one item is required").optional(),
+  notes: z.string().optional(),
+});
+
+const DeletePurchaseOrderArgsSchema = z.object({
+  purchase_order_id: z.string().min(1, "Purchase Order ID is required"),
+});
+
+const GetPurchaseOrderArgsSchema = z.object({
+  purchase_order_id: z.string().min(1, "Purchase Order ID is required"),
+});
+
+const CreateVendorArgsSchema = z.object({
+  email: z.string().email("Invalid email format"),
+  name: z.string().min(1, "Name is required"),
+  address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }),
+});
+
+const UpdateVendorArgsSchema = z.object({
+  vendor_id: z.string().min(1, "Vendor ID is required"),
+  email: z.string().email("Invalid email format").optional(),
+  name: z.string().min(1, "Name is required").optional(),
+  address: z.object({
+    line1: z.string().min(1, "Address line 1 is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(2, "State is required"),
+    postal_code: z.string().min(5, "Postal code is required"),
+    country: z.string().min(2, "Country is required"),
+  }).optional(),
+});
+
+const DeleteVendorArgsSchema = z.object({
+  vendor_id: z.string().min(1, "Vendor ID is required"),
+});
+
+const GetVendorArgsSchema = z.object({
+  vendor_id: z.string().min(1, "Vendor ID is required"),
+});
+
 const ListArgsSchema = z.object({
   page: z.number().positive().optional(),
   per_page: z.number().positive().optional(),
@@ -2306,6 +2492,66 @@ const listInventoriesTool: Tool = {
   inputSchema: ListArgsSchema.shape as any,
 };
 
+const createPurchaseOrderTool: Tool = {
+  name: "stateset_create_purchase_order",
+  description: "Creates a purchase order record",
+  inputSchema: CreatePurchaseOrderArgsSchema.shape as any,
+};
+
+const updatePurchaseOrderTool: Tool = {
+  name: "stateset_update_purchase_order",
+  description: "Updates a purchase order record",
+  inputSchema: UpdatePurchaseOrderArgsSchema.shape as any,
+};
+
+const deletePurchaseOrderTool: Tool = {
+  name: "stateset_delete_purchase_order",
+  description: "Deletes a purchase order record",
+  inputSchema: DeletePurchaseOrderArgsSchema.shape as any,
+};
+
+const getPurchaseOrderTool: Tool = {
+  name: "stateset_get_purchase_order",
+  description: "Retrieves a purchase order record",
+  inputSchema: GetPurchaseOrderArgsSchema.shape as any,
+};
+
+const listPurchaseOrdersTool: Tool = {
+  name: "stateset_list_purchase_orders",
+  description: "Lists purchase order records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
+const createVendorTool: Tool = {
+  name: "stateset_create_vendor",
+  description: "Creates a vendor record",
+  inputSchema: CreateVendorArgsSchema.shape as any,
+};
+
+const updateVendorTool: Tool = {
+  name: "stateset_update_vendor",
+  description: "Updates a vendor record",
+  inputSchema: UpdateVendorArgsSchema.shape as any,
+};
+
+const deleteVendorTool: Tool = {
+  name: "stateset_delete_vendor",
+  description: "Deletes a vendor record",
+  inputSchema: DeleteVendorArgsSchema.shape as any,
+};
+
+const getVendorTool: Tool = {
+  name: "stateset_get_vendor",
+  description: "Retrieves a vendor record",
+  inputSchema: GetVendorArgsSchema.shape as any,
+};
+
+const listVendorsTool: Tool = {
+  name: "stateset_list_vendors",
+  description: "Lists vendor records",
+  inputSchema: ListArgsSchema.shape as any,
+};
+
 const listCustomersTool: Tool = {
   name: "stateset_list_customers",
   description: "Lists customer records",
@@ -2427,6 +2673,20 @@ const resourceTemplates: ResourceTemplate[] = [
     examples: ["stateset-inventory:///INV-123"],
   },
   {
+    uriTemplate: "stateset-purchase-order:///{purchaseOrderId}",
+    name: "StateSet Purchase Order",
+    description: "Purchase Order record",
+    parameters: { purchaseOrderId: { type: "string", description: "Purchase Order ID" } },
+    examples: ["stateset-purchase-order:///PO-123"],
+  },
+  {
+    uriTemplate: "stateset-vendor:///{vendorId}",
+    name: "StateSet Vendor",
+    description: "Vendor record",
+    parameters: { vendorId: { type: "string", description: "Vendor ID" } },
+    examples: ["stateset-vendor:///VEND-123"],
+  },
+  {
     uriTemplate: "stateset-customer:///{customerId}",
     name: "StateSet Customer",
     description: "Customer record",
@@ -2460,6 +2720,10 @@ Inventory & Products
 - stateset_create_product / stateset_update_product / stateset_delete_product / stateset_get_product
 - stateset_create_inventory / stateset_update_inventory / stateset_delete_inventory / stateset_get_inventory
 
+Purchasing & Vendors
+- stateset_create_purchase_order / stateset_update_purchase_order / stateset_delete_purchase_order / stateset_get_purchase_order
+- stateset_create_vendor / stateset_update_vendor / stateset_delete_vendor / stateset_get_vendor
+
 Financial
 - stateset_create_invoice / stateset_update_invoice / stateset_delete_invoice / stateset_get_invoice
 - stateset_create_payment / stateset_update_payment / stateset_delete_payment / stateset_get_payment
@@ -2473,6 +2737,7 @@ Listing
 - stateset_list_shipments / stateset_list_fulfillment_orders / stateset_list_item_receipts / stateset_list_cash_sales
 - stateset_list_bill_of_materials / stateset_list_work_orders / stateset_list_manufacturer_orders
 - stateset_list_invoices / stateset_list_payments / stateset_list_products / stateset_list_inventories / stateset_list_customers
+- stateset_list_purchase_orders / stateset_list_vendors
 
 Best practices:
 - Validate all IDs before use
@@ -2571,6 +2836,14 @@ async function main(): Promise<void> {
             return await client.createInventory(CreateInventoryArgsSchema.parse(request.params.arguments));
           case "stateset_update_inventory":
             return await client.updateInventory(UpdateInventoryArgsSchema.parse(request.params.arguments));
+          case "stateset_create_purchase_order":
+            return await client.createPurchaseOrder(CreatePurchaseOrderArgsSchema.parse(request.params.arguments));
+          case "stateset_update_purchase_order":
+            return await client.updatePurchaseOrder(UpdatePurchaseOrderArgsSchema.parse(request.params.arguments));
+          case "stateset_create_vendor":
+            return await client.createVendor(CreateVendorArgsSchema.parse(request.params.arguments));
+          case "stateset_update_vendor":
+            return await client.updateVendor(UpdateVendorArgsSchema.parse(request.params.arguments));
           case "stateset_create_customer":
             return await client.createCustomer(CreateCustomerArgsSchema.parse(request.params.arguments));
           case "stateset_update_customer":
@@ -2605,6 +2878,10 @@ async function main(): Promise<void> {
             return await client.deleteProduct(DeleteProductArgsSchema.parse(request.params.arguments));
           case "stateset_delete_inventory":
             return await client.deleteInventory(DeleteInventoryArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_purchase_order":
+            return await client.deletePurchaseOrder(DeletePurchaseOrderArgsSchema.parse(request.params.arguments));
+          case "stateset_delete_vendor":
+            return await client.deleteVendor(DeleteVendorArgsSchema.parse(request.params.arguments));
           case "stateset_delete_customer":
             return await client.deleteCustomer(DeleteCustomerArgsSchema.parse(request.params.arguments));
           case "stateset_get_rma":
@@ -2639,6 +2916,10 @@ async function main(): Promise<void> {
             return await client.getInventory(GetInventoryArgsSchema.parse(request.params.arguments).inventory_id);
           case "stateset_get_customer":
             return await client.getCustomer(GetCustomerArgsSchema.parse(request.params.arguments).customer_id);
+          case "stateset_get_purchase_order":
+            return await client.getPurchaseOrder(GetPurchaseOrderArgsSchema.parse(request.params.arguments).purchase_order_id);
+          case "stateset_get_vendor":
+            return await client.getVendor(GetVendorArgsSchema.parse(request.params.arguments).vendor_id);
 
           case "stateset_list_rmas":
             return await client.listRMAs(ListArgsSchema.parse(request.params.arguments));
@@ -2672,6 +2953,10 @@ async function main(): Promise<void> {
             return await client.listInventories(ListArgsSchema.parse(request.params.arguments));
           case "stateset_list_customers":
             return await client.listCustomers(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_list_purchase_orders":
+            return await client.listPurchaseOrders(ListArgsSchema.parse(request.params.arguments));
+          case "stateset_list_vendors":
+            return await client.listVendors(ListArgsSchema.parse(request.params.arguments));
           case "stateset_get_api_metrics":
             return client.getApiMetrics();
 
@@ -2737,6 +3022,12 @@ async function main(): Promise<void> {
         case 'stateset-customer:':
           const customer = await client.getCustomer(path);
           return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(customer, null, 2) }] };
+        case 'stateset-purchase-order:':
+          const po = await client.getPurchaseOrder(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(po, null, 2) }] };
+        case 'stateset-vendor:':
+          const vendor = await client.getVendor(path);
+          return { contents: [{ uri: request.params.uri, mimeType: "application/json", text: JSON.stringify(vendor, null, 2) }] };
         default:
           throw new Error(`Unsupported URI: ${request.params.uri}`);
       }
@@ -2774,6 +3065,10 @@ async function main(): Promise<void> {
         updateProductTool,
         createInventoryTool,
         updateInventoryTool,
+        createPurchaseOrderTool,
+        updatePurchaseOrderTool,
+        createVendorTool,
+        updateVendorTool,
         createCustomerTool,
         updateCustomerTool,
         deleteRMATool,
@@ -2792,6 +3087,8 @@ async function main(): Promise<void> {
         deleteProductTool,
         deleteInventoryTool,
         deleteCustomerTool,
+        deletePurchaseOrderTool,
+        deleteVendorTool,
         getRMATool,
         getOrderTool,
         getSalesOrderTool,
@@ -2808,6 +3105,8 @@ async function main(): Promise<void> {
         getProductTool,
         getInventoryTool,
         getCustomerTool,
+        getPurchaseOrderTool,
+        getVendorTool,
         listRMAsTool,
         listOrdersTool,
         listSalesOrdersTool,
@@ -2824,6 +3123,8 @@ async function main(): Promise<void> {
         listProductsTool,
         listInventoriesTool,
         listCustomersTool,
+        listPurchaseOrdersTool,
+        listVendorsTool,
         getApiMetricsTool,
       ],
     }));
