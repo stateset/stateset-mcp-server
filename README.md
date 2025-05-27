@@ -35,7 +35,6 @@ The server exposes a comprehensive set of MCP tools grouped by domain.
 
 ### Listing Operations
 - `stateset_list_rmas`, `stateset_list_orders`, `stateset_list_sales_orders`, `stateset_list_warranties`, `stateset_list_shipments`, `stateset_list_fulfillment_orders`, `stateset_list_item_receipts`, `stateset_list_cash_sales`
-- `stateset_list_bill_of_materials`, `stateset_list_work_orders`, `stateset_list_manufacturer_orders`
 - `stateset_list_invoices`, `stateset_list_payments`, `stateset_list_products`, `stateset_list_inventories`, `stateset_list_customers`, `stateset_get_api_metrics`
 
 ## Usage
