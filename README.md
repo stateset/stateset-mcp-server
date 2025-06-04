@@ -44,6 +44,7 @@ Ensure the following environment variables are set before running the server:
 - `STATESET_API_KEY` – your API key (required)
 - `STATESET_BASE_URL` – base URL for the StateSet API (defaults to `https://api.stateset.io/v1`)
 - `REQUESTS_PER_HOUR` – rate limit for outgoing requests (defaults to `1000`)
+- `API_TIMEOUT_MS` – request timeout in milliseconds (defaults to `10000`)
 
 Install dependencies with `npm install` and start the server using:
 

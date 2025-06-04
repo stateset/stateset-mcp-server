@@ -32,6 +32,7 @@ interface Config {
   apiKey: string;
   baseUrl: string;
   requestsPerHour: number;
+  timeoutMs: number;
 }
 
 // Type definitions
@@ -641,7 +642,7 @@ class StateSetMCPClient {
         'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json',
       },
-      timeout: 10000,
+      timeout: config.timeoutMs,
     });
 
     this.apiClient.interceptors.response.use(
@@ -2794,12 +2795,14 @@ async function main(): Promise<void> {
       STATESET_API_KEY: z.string().min(1, 'STATESET_API_KEY is required'),
       STATESET_BASE_URL: z.string().url().default('https://api.stateset.io/v1'),
       REQUESTS_PER_HOUR: z.coerce.number().positive().default(1000),
+      API_TIMEOUT_MS: z.coerce.number().positive().default(10000),
     }).parse(process.env);
 
     const config: Config = {
       apiKey: env.STATESET_API_KEY,
       baseUrl: env.STATESET_BASE_URL,
       requestsPerHour: env.REQUESTS_PER_HOUR,
+      timeoutMs: env.API_TIMEOUT_MS,
     };
 
     const client = new StateSetMCPClient(config);
