@@ -560,13 +560,13 @@ class RateLimiter {
     this.minDelayMs = 3600000 / requestsPerHour;
   }
 
-  async enqueue<T>(fn: () => Promise<T>, operation: string): Promise<T> {
+  async enqueue<T>(fn: () => Promise<T>, operation: string, retries = 3): Promise<T> {
     const startTime = Date.now();
     return new Promise((resolve, reject) => {
       this.queue.push(async () => {
         try {
           logger.debug({ operation }, 'Starting API request');
-          const result = await fn();
+          const result = await this.executeWithRetry(fn, operation, retries);
           const duration = Date.now() - startTime;
           this.trackRequest(startTime, duration);
           logger.debug({ operation, duration }, 'Completed API request');
@@ -578,6 +578,29 @@ class RateLimiter {
       });
       this.processQueue();
     });
+  }
+
+  private async executeWithRetry<T>(fn: () => Promise<T>, operation: string, retries: number): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        if (attempt > retries || !this.isRetryableError(error)) {
+          throw error;
+        }
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        logger.warn({ operation, attempt, delay }, 'Retrying API request');
+        await new Promise(res => setTimeout(res, delay));
+      }
+    }
+  }
+
+  private isRetryableError(error: any): boolean {
+    if (axios.isAxiosError(error)) {
+      return !error.response || error.code === 'ECONNABORTED' ||
+             (error.response.status >= 500 && error.response.status < 600);
+    }
+    return false;
   }
 
   private async processQueue(): Promise<void> {
