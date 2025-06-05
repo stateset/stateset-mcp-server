@@ -4,6 +4,10 @@ A Model Context Protocol server for the StateSet API.
 
 This server provides integration with StateSet's issue operations system through MCP, allowing LLMs to interact with StateSet.
 
+## Project Structure
+
+The TypeScript sources reside under `src/`. The main entry point is `src/server.ts`.
+
 ## Tools
 
 The server exposes a comprehensive set of MCP tools grouped by domain.
