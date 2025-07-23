@@ -1,6 +1,4 @@
-import { config } from '@config/index';
 import { createLogger } from '@utils/logger';
-import { EventEmitter } from 'events';
 
 const logger = createLogger('rate-limiter');
 
@@ -23,28 +21,35 @@ export enum Priority {
   CRITICAL = 3,
 }
 
-// Rate limiter strategies
-export enum Strategy {
-  TOKEN_BUCKET = 'token_bucket',
-  SLIDING_WINDOW = 'sliding_window',
-  ADAPTIVE = 'adaptive',
+// Rate limiter configuration
+export interface RateLimiterConfig {
+  requestsPerHour: number;
+  retryAttempts: number;
+  retryDelay: number;
 }
 
 // Request interface
-interface Request<T> {
+interface QueuedRequest<T> {
   id: string;
   fn: () => Promise<T>;
-  priority: Priority;
-  timestamp: number;
   resolve: (value: T) => void;
   reject: (error: Error) => void;
   retries: number;
   operation: string;
+  timestamp: number;
 }
 
-// Abstract rate limiter strategy
-abstract class RateLimiterStrategy extends EventEmitter {
-  protected metrics: RateLimiterMetrics = {
+export class RateLimiter {
+  private readonly requestsPerHour: number;
+  private readonly retryAttempts: number;
+  private readonly retryDelay: number;
+  private readonly minDelayMs: number;
+  private queue: Array<QueuedRequest<any>> = [];
+  private processing = false;
+  private lastRequestTime = 0;
+  private requestTimes: number[] = [];
+  private requestTimestamps: number[] = [];
+  private metrics: RateLimiterMetrics = {
     totalRequests: 0,
     acceptedRequests: 0,
     rejectedRequests: 0,
@@ -54,410 +59,181 @@ abstract class RateLimiterStrategy extends EventEmitter {
     availableTokens: 0,
   };
 
-  abstract canProceed(): boolean;
-  abstract consume(): void;
-  abstract getMetrics(): RateLimiterMetrics;
-}
+  constructor(config: RateLimiterConfig) {
+    this.requestsPerHour = config.requestsPerHour;
+    this.retryAttempts = config.retryAttempts;
+    this.retryDelay = config.retryDelay;
+    this.minDelayMs = 3600000 / config.requestsPerHour; // milliseconds between requests
+  }
 
-// Token Bucket Strategy
-class TokenBucketStrategy extends RateLimiterStrategy {
-  private tokens: number;
-  private readonly maxTokens: number;
-  private refillRate: number;
-  private lastRefill: number;
-
-  constructor(maxTokens: number, refillRate: number) {
-    super();
-    this.maxTokens = maxTokens;
-    this.tokens = maxTokens;
-    this.refillRate = refillRate;
-    this.lastRefill = Date.now();
+  async enqueue<T>(fn: () => Promise<T>, operation: string, retries?: number): Promise<T> {
+    const startTime = Date.now();
+    const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Start refill timer
-    this.startRefillTimer();
-  }
-
-  canProceed(): boolean {
-    this.refill();
-    return this.tokens >= 1;
-  }
-
-  consume(): void {
-    if (this.tokens >= 1) {
-      this.tokens--;
-      this.metrics.acceptedRequests++;
-    } else {
-      this.metrics.rejectedRequests++;
-    }
-    this.metrics.totalRequests++;
-    this.updateMetrics();
-  }
-
-  getMetrics(): RateLimiterMetrics {
-    this.refill();
-    return {
-      ...this.metrics,
-      availableTokens: Math.floor(this.tokens),
-    };
-  }
-
-  private refill(): void {
-    const now = Date.now();
-    const timePassed = now - this.lastRefill;
-    const tokensToAdd = (timePassed / 1000) * this.refillRate;
-    
-    this.tokens = Math.min(this.maxTokens, this.tokens + tokensToAdd);
-    this.lastRefill = now;
-  }
-
-  private startRefillTimer(): void {
-    setInterval(() => {
-      this.refill();
-      this.emit('refill', this.tokens);
-    }, 1000);
-  }
-
-  private updateMetrics(): void {
-    this.metrics.currentRate = this.metrics.acceptedRequests / (Date.now() / 1000 / 60);
-  }
-
-  getRefillRate(): number {
-    return this.refillRate;
-  }
-
-  setRefillRate(rate: number): void {
-    this.refillRate = rate;
-  }
-}
-
-// Sliding Window Strategy
-class SlidingWindowStrategy extends RateLimiterStrategy {
-  private readonly windowSize: number;
-  private readonly maxRequests: number;
-  private requests: number[] = [];
-
-  constructor(windowSize: number, maxRequests: number) {
-    super();
-    this.windowSize = windowSize;
-    this.maxRequests = maxRequests;
-    
-    // Start cleanup timer
-    this.startCleanupTimer();
-  }
-
-  canProceed(): boolean {
-    this.cleanup();
-    return this.requests.length < this.maxRequests;
-  }
-
-  consume(): void {
-    this.cleanup();
-    
-    if (this.requests.length < this.maxRequests) {
-      this.requests.push(Date.now());
-      this.metrics.acceptedRequests++;
-    } else {
-      this.metrics.rejectedRequests++;
-    }
-    
-    this.metrics.totalRequests++;
-    this.updateMetrics();
-  }
-
-  getMetrics(): RateLimiterMetrics {
-    this.cleanup();
-    return {
-      ...this.metrics,
-      availableTokens: Math.max(0, this.maxRequests - this.requests.length),
-    };
-  }
-
-  private cleanup(): void {
-    const cutoff = Date.now() - this.windowSize;
-    this.requests = this.requests.filter(time => time > cutoff);
-  }
-
-  private startCleanupTimer(): void {
-    setInterval(() => {
-      this.cleanup();
-      this.emit('cleanup', this.requests.length);
-    }, 1000);
-  }
-
-  private updateMetrics(): void {
-    this.metrics.currentRate = this.requests.length;
-  }
-}
-
-// Adaptive Strategy (adjusts rate based on response times)
-class AdaptiveStrategy extends RateLimiterStrategy {
-  private tokenBucket: TokenBucketStrategy;
-  private responseTimes: number[] = [];
-  private readonly targetResponseTime: number;
-  private readonly adjustmentFactor: number;
-
-  constructor(
-    initialTokens: number,
-    initialRate: number,
-    targetResponseTime: number = 1000,
-    adjustmentFactor: number = 0.1
-  ) {
-    super();
-    this.tokenBucket = new TokenBucketStrategy(initialTokens, initialRate);
-    this.targetResponseTime = targetResponseTime;
-    this.adjustmentFactor = adjustmentFactor;
-    
-    // Start adjustment timer
-    this.startAdjustmentTimer();
-  }
-
-  canProceed(): boolean {
-    return this.tokenBucket.canProceed();
-  }
-
-  consume(): void {
-    this.tokenBucket.consume();
-    this.metrics = this.tokenBucket.getMetrics();
-  }
-
-  recordResponseTime(duration: number): void {
-    this.responseTimes.push(duration);
-    if (this.responseTimes.length > 100) {
-      this.responseTimes.shift();
-    }
-  }
-
-  getMetrics(): RateLimiterMetrics {
-    return this.tokenBucket.getMetrics();
-  }
-
-  private adjustRate(): void {
-    if (this.responseTimes.length < 10) return;
-
-    const avgResponseTime = this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length;
-    
-    if (avgResponseTime > this.targetResponseTime) {
-      // Slow down
-      const currentRate = this.tokenBucket.getRefillRate();
-      const newRate = Math.max(1, currentRate * (1 - this.adjustmentFactor));
-      this.tokenBucket.setRefillRate(newRate);
-      logger.debug('Adaptive rate limiter slowing down', { avgResponseTime, newRate });
-    } else if (avgResponseTime < this.targetResponseTime * 0.8) {
-      // Speed up
-      const currentRate = this.tokenBucket.getRefillRate();
-      const newRate = currentRate * (1 + this.adjustmentFactor);
-      this.tokenBucket.setRefillRate(newRate);
-      logger.debug('Adaptive rate limiter speeding up', { avgResponseTime, newRate });
-    }
-  }
-
-  private startAdjustmentTimer(): void {
-    setInterval(() => {
-      this.adjustRate();
-    }, 5000);
-  }
-}
-
-// Main Rate Limiter
-export class RateLimiter {
-  private strategy: RateLimiterStrategy;
-  private queue: Request<any>[] = [];
-  private processing = false;
-  private waitTimes: number[] = [];
-
-  constructor(strategy: Strategy = Strategy.TOKEN_BUCKET) {
-    this.strategy = this.createStrategy(strategy);
-    
-    // Listen to strategy events
-    this.strategy.on('refill', () => this.processQueue());
-    this.strategy.on('cleanup', () => this.processQueue());
-  }
-
-  async execute<T>(
-    fn: () => Promise<T>,
-    operation: string,
-    priority: Priority = Priority.NORMAL,
-    retries: number = config.rateLimit.retryAttempts
-  ): Promise<T> {
     return new Promise((resolve, reject) => {
-      const request: Request<T> = {
-        id: `${Date.now()}-${Math.random()}`,
+      const request: QueuedRequest<T> = {
+        id: requestId,
         fn,
-        priority,
-        timestamp: Date.now(),
         resolve,
         reject,
-        retries,
+        retries: retries || this.retryAttempts,
         operation,
+        timestamp: startTime,
       };
-
-      this.enqueue(request);
-    });
-  }
-
-  private enqueue<T>(request: Request<T>): void {
-    // Insert based on priority
-    let inserted = false;
-    for (let i = 0; i < this.queue.length; i++) {
-      if (request.priority > this.queue[i]!.priority) {
-        this.queue.splice(i, 0, request);
-        inserted = true;
-        break;
-      }
-    }
-    
-    if (!inserted) {
+      
       this.queue.push(request);
-    }
-
-    logger.logRateLimit(request.operation, {
-      queueLength: this.queue.length,
-      priority: Priority[request.priority],
+      this.metrics.queuedRequests = this.queue.length;
+      this.metrics.totalRequests++;
+      
+      logger.debug({ operation, requestId, queueLength: this.queue.length }, 'Request queued');
+      
+      this.processQueue();
     });
-
-    this.processQueue();
   }
 
   private async processQueue(): Promise<void> {
     if (this.processing || this.queue.length === 0) return;
     
     this.processing = true;
+    logger.debug({ queueLength: this.queue.length }, 'Processing queue');
 
-    while (this.queue.length > 0 && this.strategy.canProceed()) {
-      const request = this.queue.shift()!;
-      const waitTime = Date.now() - request.timestamp;
-      this.waitTimes.push(waitTime);
+    while (this.queue.length > 0) {
+      const now = Date.now();
+      const requestsInLastHour = this.requestTimestamps.filter(t => t > now - 3600000).length;
       
-      if (this.waitTimes.length > 100) {
-        this.waitTimes.shift();
+      // Check if we need to wait due to rate limiting
+      if (requestsInLastHour >= this.requestsPerHour * 0.9) {
+        const waitTime = this.minDelayMs - (now - this.lastRequestTime);
+        if (waitTime > 0) {
+          logger.debug({ waitTime }, 'Rate limit reached, waiting');
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
       }
 
-      this.strategy.consume();
+      const request = this.queue.shift();
+      if (!request) break;
       
-      // Execute request
-      this.executeRequest(request, waitTime);
+      this.metrics.queuedRequests = this.queue.length;
+      
+      try {
+        logger.debug({ operation: request.operation, requestId: request.id }, 'Executing request');
+        
+        const result = await this.executeWithRetry(request);
+        const duration = Date.now() - request.timestamp;
+        
+        this.trackRequest(request.timestamp, duration);
+        this.metrics.acceptedRequests++;
+        
+        logger.debug({ 
+          operation: request.operation, 
+          requestId: request.id, 
+          duration 
+        }, 'Request completed');
+        
+        request.resolve(result);
+      } catch (error) {
+        this.metrics.rejectedRequests++;
+        
+        logger.error({ 
+          operation: request.operation, 
+          requestId: request.id, 
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }, 'Request failed');
+        
+        request.reject(error instanceof Error ? error : new Error('Unknown error'));
+      }
+      
+      this.lastRequestTime = Date.now();
     }
-
+    
     this.processing = false;
   }
 
-  private async executeRequest<T>(request: Request<T>, waitTime: number): Promise<void> {
-    const timer = logger.startTimer(`rate_limiter.${request.operation}`);
-    
-    try {
-      const result = await request.fn();
-      timer();
-      
-      // Record response time for adaptive strategy
-      if (this.strategy instanceof AdaptiveStrategy) {
-        const duration = Date.now() - request.timestamp;
-        this.strategy.recordResponseTime(duration);
-      }
-      
-      request.resolve(result);
-    } catch (error) {
-      timer();
-      
-      if (request.retries > 0 && this.isRetryableError(error)) {
-        logger.debug('Retrying request', {
-          operation: request.operation,
-          retriesLeft: request.retries,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
+  private async executeWithRetry<T>(request: QueuedRequest<T>): Promise<T> {
+    for (let attempt = 1; attempt <= request.retries + 1; attempt++) {
+      try {
+        return await request.fn();
+      } catch (error) {
+        if (attempt > request.retries || !this.isRetryableError(error)) {
+          throw error;
+        }
         
-        // Re-enqueue with reduced retries
-        request.retries--;
-        request.timestamp = Date.now();
+        const delay = Math.pow(2, attempt - 1) * this.retryDelay;
+        logger.warn({ 
+          operation: request.operation, 
+          attempt, 
+          delay,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }, 'Retrying request');
         
-        // Add exponential backoff
-        setTimeout(() => {
-          this.enqueue(request);
-        }, Math.pow(2, config.rateLimit.retryAttempts - request.retries) * config.rateLimit.retryDelay);
-      } else {
-        logger.error('Request failed', error, {
-          operation: request.operation,
-          waitTime,
-        });
-        request.reject(error as Error);
+        await new Promise(res => setTimeout(res, delay));
       }
     }
+    
+    throw new Error('Max retries exceeded');
   }
 
   private isRetryableError(error: any): boolean {
-    if (error.response) {
-      const status = error.response.status;
-      return status === 429 || (status >= 500 && status < 600);
+    // Check if error is a network error or 5xx server error
+    if (error?.response?.status) {
+      return error.response.status >= 500 && error.response.status < 600;
     }
-    return error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT';
+    
+    // Check for network errors
+    if (error?.code) {
+      return ['ECONNABORTED', 'ENOTFOUND', 'ECONNRESET', 'ETIMEDOUT'].includes(error.code);
+    }
+    
+    return false;
   }
 
-  private createStrategy(strategy: Strategy): RateLimiterStrategy {
-    switch (strategy) {
-      case Strategy.TOKEN_BUCKET:
-        return new TokenBucketStrategy(
-          config.rateLimit.burstSize,
-          config.rateLimit.requestsPerMinute / 60
-        );
-      
-      case Strategy.SLIDING_WINDOW:
-        return new SlidingWindowStrategy(
-          60000, // 1 minute window
-          config.rateLimit.requestsPerMinute
-        );
-      
-      case Strategy.ADAPTIVE:
-        return new AdaptiveStrategy(
-          config.rateLimit.burstSize,
-          config.rateLimit.requestsPerMinute / 60
-        );
-      
-      default:
-        logger.warn(`Unknown rate limiter strategy: ${strategy}, defaulting to token bucket`);
-        return new TokenBucketStrategy(
-          config.rateLimit.burstSize,
-          config.rateLimit.requestsPerMinute / 60
-        );
-    }
+  private trackRequest(startTime: number, duration: number): void {
+    this.requestTimes.push(duration);
+    this.requestTimestamps.push(startTime);
+    
+    // Keep only last hour of data
+    const oneHourAgo = Date.now() - 3600000;
+    this.requestTimestamps = this.requestTimestamps.filter(t => t > oneHourAgo);
+    this.requestTimes = this.requestTimes.slice(-this.requestTimestamps.length);
+    
+    // Update metrics
+    this.updateMetrics();
   }
 
-  getMetrics(): RateLimiterMetrics & { averageWaitTime: number } {
-    const metrics = this.strategy.getMetrics();
-    const avgWaitTime = this.waitTimes.length > 0
-      ? this.waitTimes.reduce((a, b) => a + b, 0) / this.waitTimes.length
+  private updateMetrics(): void {
+    const now = Date.now();
+    const oneHourAgo = now - 3600000;
+    const recentRequests = this.requestTimestamps.filter(t => t > oneHourAgo);
+    
+    this.metrics.currentRate = recentRequests.length;
+    this.metrics.availableTokens = Math.max(0, this.requestsPerHour - recentRequests.length);
+    this.metrics.averageWaitTime = this.requestTimes.length > 0
+      ? this.requestTimes.reduce((a, b) => a + b, 0) / this.requestTimes.length
       : 0;
+  }
 
+  getMetrics(): RateLimiterMetrics {
+    this.updateMetrics();
+    return { ...this.metrics };
+  }
+
+  // Get queue status
+  getQueueStatus(): { length: number; processing: boolean } {
     return {
-      ...metrics,
-      queuedRequests: this.queue.length,
-      averageWaitTime: avgWaitTime,
+      length: this.queue.length,
+      processing: this.processing,
     };
   }
 
-  // Change strategy at runtime
-  changeStrategy(strategy: Strategy): void {
-    const oldMetrics = this.strategy.getMetrics();
-    this.strategy = this.createStrategy(strategy);
-    
-    // Transfer metrics
-    this.strategy['metrics'] = oldMetrics;
-    
-    logger.info('Rate limiter strategy changed', { newStrategy: strategy });
-  }
-
-  // Clear the queue
+  // Clear the queue (useful for testing or emergency situations)
   clearQueue(): void {
-    const clearedCount = this.queue.length;
+    const clearedRequests = this.queue.length;
     this.queue.forEach(request => {
       request.reject(new Error('Queue cleared'));
     });
     this.queue = [];
+    this.metrics.queuedRequests = 0;
     
-    logger.info('Rate limiter queue cleared', { clearedCount });
+    logger.info({ clearedRequests }, 'Queue cleared');
   }
-}
-
-// Create singleton instance
-export const rateLimiter = new RateLimiter();
-
-// Export for custom instances
-export { Strategy as RateLimiterStrategy }; 
+} 
