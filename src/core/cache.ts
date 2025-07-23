@@ -280,7 +280,7 @@ export class CacheManager {
           cache.set(key, value);
         }
       } catch (error) {
-        logger.error('Cache fetcher error', error, { namespace, key });
+        logger.error({ namespace, key, error: error instanceof Error ? error.message : String(error) }, 'Cache fetcher error');
         throw error;
       }
     }
@@ -328,10 +328,10 @@ export class CacheManager {
         try {
           const timer = logger.startTimer(`cache.warmup.${ns}`);
           await warmupFn();
-          timer();
+          timer.end();
           logger.info('Cache warmup completed', { namespace: ns });
         } catch (error) {
-          logger.error('Cache warmup failed', error, { namespace: ns });
+          logger.error({ namespace: ns, error: error instanceof Error ? error.message : String(error) }, 'Cache warmup failed');
         }
       }
     }

@@ -351,7 +351,7 @@ export class HealthChecker extends EventEmitter {
       try {
         await this.check();
       } catch (error) {
-        logger.error('Health check failed', error);
+        logger.error('Health check failed', error instanceof Error ? error.message : String(error));
       }
     }, config.monitoring.healthCheckInterval);
 

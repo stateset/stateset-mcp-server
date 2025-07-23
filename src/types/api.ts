@@ -1,83 +1,30 @@
-import type { Address, BaseItem, PricedItem, TrackedItem, WarrantyItem } from './common';
+import type { Address, BaseItem, PricedItem, TrackedItem } from './common';
 
-/**
- * Base StateSet API response
- */
+// Base response interface
 export interface StateSetResponse {
   id: string;
   status: string;
   created_at: string;
   updated_at: string;
   url: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
-// Customer types
-export interface Customer extends StateSetResponse {
-  email: string;
-  name: string;
-  address: Address;
-  phone?: string;
-  company?: string;
+// List operation arguments
+export interface ListArgs {
+  page?: number;
+  per_page?: number;
 }
 
-export interface CreateCustomerArgs {
-  email: string;
-  name: string;
-  address: Address;
-  phone?: string;
-  company?: string;
-}
-
-export interface UpdateCustomerArgs {
-  customer_id: string;
-  email?: string;
-  name?: string;
-  address?: Address;
-  phone?: string;
-  company?: string;
-}
-
-// Order types
-export interface Order extends StateSetResponse {
-  customer_email: string;
-  items: PricedItem[];
-  shipping_address: Address;
-  billing_address?: Address;
-  total_amount: number;
-  tax_amount?: number;
-  shipping_amount?: number;
-}
-
-export interface CreateOrderArgs {
-  customer_email: string;
-  items: PricedItem[];
-  shipping_address: Address;
-  billing_address?: Address;
-}
-
-export interface UpdateOrderArgs {
-  order_id: string;
-  status?: string;
-  items?: PricedItem[];
-  shipping_address?: Address;
-  billing_address?: Address;
-}
-
-// RMA types
-export interface RMA extends StateSetResponse {
-  order_id: string;
-  customer_email: string;
-  items: BaseItem[];
-  reason: string;
-  notes?: string;
-  resolution?: string;
+// RMA interfaces
+export interface RMAItem extends BaseItem {
+  reason?: string;
 }
 
 export interface CreateRMAArgs {
   order_id: string;
   customer_email: string;
-  items: BaseItem[];
+  items: RMAItem[];
   reason: string;
   notes?: string;
 }
@@ -89,30 +36,62 @@ export interface UpdateRMAArgs {
   notes?: string;
 }
 
-// Product types
-export interface Product extends StateSetResponse {
-  name: string;
-  sku: string;
-  description?: string;
-  price: number;
-  cost?: number;
-  weight?: number;
-  dimensions?: {
-    length: number;
-    width: number;
-    height: number;
-    unit: string;
-  };
+export interface DeleteRMAArgs {
+  rma_id: string;
 }
 
+// Order interfaces
+export interface OrderItem extends PricedItem {}
+
+export interface CreateOrderArgs {
+  customer_email: string;
+  items: OrderItem[];
+  shipping_address: Address;
+  billing_address?: Address;
+}
+
+export interface UpdateOrderArgs {
+  order_id: string;
+  status?: string;
+  items?: OrderItem[];
+  shipping_address?: Address;
+  billing_address?: Address;
+}
+
+export interface DeleteOrderArgs {
+  order_id: string;
+}
+
+// Customer interfaces
+export interface CreateCustomerArgs {
+  email: string;
+  name: string;
+  address: Address;
+  phone?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface UpdateCustomerArgs {
+  customer_id: string;
+  email?: string;
+  name?: string;
+  address?: Address;
+  phone?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface DeleteCustomerArgs {
+  customer_id: string;
+}
+
+// Product interfaces
 export interface CreateProductArgs {
   name: string;
   sku: string;
   description?: string;
   price: number;
-  cost?: number;
-  weight?: number;
-  dimensions?: Product['dimensions'];
+  category?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface UpdateProductArgs {
@@ -121,48 +100,63 @@ export interface UpdateProductArgs {
   sku?: string;
   description?: string;
   price?: number;
-  cost?: number;
-  weight?: number;
-  dimensions?: Product['dimensions'];
+  category?: string;
+  metadata?: Record<string, any>;
 }
 
-// Inventory types
-export interface Inventory extends StateSetResponse {
+export interface DeleteProductArgs {
   product_id: string;
-  quantity: number;
-  location: string;
-  reserved_quantity?: number;
-  available_quantity?: number;
 }
 
+// Inventory interfaces
 export interface CreateInventoryArgs {
   product_id: string;
   quantity: number;
   location: string;
+  warehouse?: string;
 }
 
 export interface UpdateInventoryArgs {
   inventory_id: string;
   quantity?: number;
   location?: string;
-  reserved_quantity?: number;
+  warehouse?: string;
 }
 
-// Shipment types
-export interface Shipment extends StateSetResponse {
+export interface DeleteInventoryArgs {
+  inventory_id: string;
+}
+
+// Warranty interfaces
+export interface WarrantyItem extends BaseItem {
+  serial_number?: string;
+  warranty_period_months: number;
+}
+
+export interface CreateWarrantyArgs {
   order_id: string;
   customer_email: string;
-  items: TrackedItem[];
-  carrier: string;
-  destination_address: Address;
-  tracking_number?: string;
-  estimated_delivery?: string;
+  items: WarrantyItem[];
+  notes?: string;
 }
+
+export interface UpdateWarrantyArgs {
+  warranty_id: string;
+  status?: string;
+  notes?: string;
+}
+
+export interface DeleteWarrantyArgs {
+  warranty_id: string;
+}
+
+// Shipment interfaces
+export interface ShipmentItem extends TrackedItem {}
 
 export interface CreateShipmentArgs {
   order_id: string;
   customer_email: string;
-  items: TrackedItem[];
+  items: ShipmentItem[];
   carrier: string;
   destination_address: Address;
 }
@@ -175,65 +169,28 @@ export interface UpdateShipmentArgs {
   destination_address?: Address;
 }
 
-// Invoice types
-export interface Invoice extends StateSetResponse {
-  order_id: string;
-  customer_email: string;
-  items: BaseItem[];
-  total_amount: number;
-  tax_amount?: number;
-  paid_amount?: number;
-  due_date?: string;
-  notes?: string;
+export interface DeleteShipmentArgs {
+  shipment_id: string;
 }
 
-export interface CreateInvoiceArgs {
-  order_id: string;
-  customer_email: string;
-  items: BaseItem[];
-  notes?: string;
+// API Metrics
+export interface ApiMetrics {
+  totalRequests: number;
+  requestsInLastHour: number;
+  averageRequestTime: number;
+  queueLength: number;
+  lastRequestTime: string;
 }
 
-export interface UpdateInvoiceArgs {
-  invoice_id: string;
-  items?: BaseItem[];
-  notes?: string;
-  status?: string;
-}
-
-// Payment types
-export interface Payment extends StateSetResponse {
-  order_id: string;
-  customer_email: string;
-  amount: number;
-  payment_method: string;
-  transaction_id?: string;
-  notes?: string;
-}
-
-export interface CreatePaymentArgs {
-  order_id: string;
-  customer_email: string;
-  amount: number;
-  payment_method: string;
-  items: BaseItem[];
-  notes?: string;
-}
-
-export interface UpdatePaymentArgs {
-  payment_id: string;
-  amount?: number;
-  payment_method?: string;
-  items?: BaseItem[];
-  notes?: string;
-  status?: string;
-}
-
-// Generic delete and get args
-export interface DeleteArgs {
-  id: string;
-}
-
-export interface GetArgs {
-  id: string;
+// Error types
+export class StateSetApiError extends Error {
+  constructor(
+    message: string,
+    public statusCode?: number,
+    public response?: any,
+    public requestId?: string
+  ) {
+    super(message);
+    this.name = 'StateSetApiError';
+  }
 } 

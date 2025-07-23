@@ -1,258 +1,181 @@
-import helmet from 'helmet';
 import cors from 'cors';
-import compression from 'compression';
-import { Request, Response, NextFunction, RequestHandler } from 'express';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import type { Request, Response, NextFunction } from 'express';
+import type { Config } from '@config/config';
 import { createLogger } from '@utils/logger';
-import { config } from '@config/index';
 
 const logger = createLogger('security');
 
-// Security headers configuration
-export const securityHeaders = helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
-    },
-  },
-  crossOriginEmbedderPolicy: true,
-  crossOriginOpenerPolicy: true,
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-  dnsPrefetchControl: true,
-  frameguard: { action: 'deny' },
-  hidePoweredBy: true,
-  hsts: {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true,
-  },
-  ieNoOpen: true,
-  noSniff: true,
-  originAgentCluster: true,
-  permittedCrossDomainPolicies: false,
-  referrerPolicy: { policy: 'no-referrer' },
-  xssFilter: true,
-});
-
-// CORS configuration
-export const corsOptions = cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    const allowedOrigins = config.security?.allowedOrigins || ['http://localhost:3000'];
-    
-    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
-  exposedHeaders: ['X-Request-ID', 'X-RateLimit-Limit', 'X-RateLimit-Remaining'],
-  maxAge: 86400, // 24 hours
-});
-
-// Compression middleware
-export const compressionMiddleware = compression({
-  filter: (req: Request, res: Response) => {
-    // Don't compress responses with this request header
-    if (req.headers['x-no-compression']) {
-      return false;
-    }
-    // Fallback to standard filter function
-    return compression.filter(req, res);
-  },
-  level: 6, // Balanced compression level
-  threshold: 1024, // Only compress responses larger than 1KB
-});
-
-// Request sanitization middleware
-export const sanitizeRequest: RequestHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  // Remove any null bytes from request
-  const sanitizeValue = (value: any): any => {
-    if (typeof value === 'string') {
-      return value.replace(/\0/g, '');
-    }
-    if (Array.isArray(value)) {
-      return value.map(sanitizeValue);
-    }
-    if (value && typeof value === 'object') {
-      const sanitized: any = {};
-      for (const key in value) {
-        sanitized[key] = sanitizeValue(value[key]);
+/**
+ * CORS middleware configuration
+ */
+export function createCorsMiddleware(config: Config) {
+  const allowedOrigins = config.security.allowedOrigins || ['http://localhost:3000'];
+  
+  return cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
       }
-      return sanitized;
-    }
-    return value;
-  };
+      
+      logger.warn('CORS request blocked', { origin, allowedOrigins });
+      const error = new Error('Not allowed by CORS');
+      callback(error, false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  });
+}
 
-  req.body = sanitizeValue(req.body);
-  req.query = sanitizeValue(req.query);
-  req.params = sanitizeValue(req.params);
-
-  next();
-};
-
-// API key validation middleware
-export const validateApiKey: RequestHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const apiKey = req.headers['x-api-key'] || req.headers.authorization?.replace('Bearer ', '');
-
-  if (!apiKey) {
-    logger.warn({ ip: req.ip, path: req.path }, 'Missing API key');
-    return res.status(401).json({
-      error: 'Unauthorized',
-      message: 'API key is required',
-    });
+/**
+ * Helmet security middleware configuration
+ */
+export function createHelmetMiddleware(config: Config) {
+  if (!config.security.enableHelmet) {
+    return (req: Request, res: Response, next: NextFunction) => next();
   }
 
-  // In a real implementation, validate against a database or service
-  if (apiKey !== config.api.apiKey) {
-    logger.warn({ ip: req.ip, path: req.path }, 'Invalid API key');
-    return res.status(401).json({
-      error: 'Unauthorized',
-      message: 'Invalid API key',
-    });
-  }
+  return helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  });
+}
 
-  // Add user context to request
-  (req as any).user = {
-    apiKey: apiKey.substring(0, 8) + '...',
-    authenticated: true,
-  };
+/**
+ * Rate limiting middleware
+ */
+export function createRateLimitMiddleware(config: Config) {
+  return rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: config.rateLimit.requestsPerMinute,
+    message: {
+      error: 'Too many requests',
+      retryAfter: 60,
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req: Request, res: Response) => {
+      logger.warn('Rate limit exceeded', {
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        path: req.path,
+      });
+      
+      res.status(429).json({
+        error: 'Too many requests',
+        message: 'Rate limit exceeded. Please try again later.',
+        retryAfter: 60,
+      });
+    },
+  });
+}
 
-  next();
-};
-
-// IP whitelist middleware
-export const ipWhitelist: RequestHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const whitelist = config.security?.ipWhitelist || [];
-  
-  if (whitelist.length === 0) {
-    return next(); // No whitelist configured
-  }
-
-  const clientIp = req.ip || req.connection.remoteAddress;
-  
-  if (!clientIp || !whitelist.includes(clientIp)) {
-    logger.warn({ ip: clientIp, path: req.path }, 'IP not in whitelist');
-    return res.status(403).json({
-      error: 'Forbidden',
-      message: 'Access denied',
-    });
-  }
-
-  next();
-};
-
-// Request size limit middleware
-export const requestSizeLimit = (limit: string = '10mb'): RequestHandler => {
+/**
+ * API key authentication middleware
+ */
+export function createApiKeyMiddleware(config: Config) {
   return (req: Request, res: Response, next: NextFunction) => {
-    const contentLength = parseInt(req.headers['content-length'] || '0', 10);
-    const maxSize = parseSize(limit);
+    const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
+    
+    if (!apiKey) {
+      logger.warn('Missing API key', { ip: req.ip, path: req.path });
+      return res.status(401).json({
+        error: 'Authentication required',
+        message: 'API key is required',
+      });
+    }
 
-    if (contentLength > maxSize) {
-      logger.warn(
-        { ip: req.ip, path: req.path, contentLength, maxSize },
-        'Request size exceeds limit'
-      );
-      return res.status(413).json({
-        error: 'Payload Too Large',
-        message: `Request size exceeds limit of ${limit}`,
+    const expectedKey = config.api.key || config.api.apiKey;
+    if (Array.isArray(apiKey) ? apiKey[0] !== expectedKey : apiKey !== expectedKey) {
+      logger.warn('Invalid API key', { 
+        ip: req.ip, 
+        path: req.path,
+        apiKey: Array.isArray(apiKey) ? 
+          apiKey[0].substring(0, 8) + '...' : 
+          apiKey.substring(0, 8) + '...',
+      });
+      return res.status(401).json({
+        error: 'Authentication failed',
+        message: 'Invalid API key',
       });
     }
 
     next();
   };
-};
-
-// Helper function to parse size strings
-function parseSize(size: string): number {
-  const units: Record<string, number> = {
-    b: 1,
-    kb: 1024,
-    mb: 1024 * 1024,
-    gb: 1024 * 1024 * 1024,
-  };
-
-  const match = size.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*([a-z]+)$/);
-  if (!match) {
-    throw new Error(`Invalid size format: ${size}`);
-  }
-
-  const [, value, unit] = match;
-  const multiplier = units[unit];
-
-  if (!multiplier) {
-    throw new Error(`Unknown size unit: ${unit}`);
-  }
-
-  return parseFloat(value) * multiplier;
 }
 
-// Security audit logging
-export const auditLog: RequestHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const startTime = Date.now();
+/**
+ * IP whitelist middleware
+ */
+export function createIpWhitelistMiddleware(config: Config) {
+  const whitelist = config.security.ipWhitelist || [];
+  
+  if (whitelist.length === 0) {
+    // No whitelist configured, allow all IPs
+    return (req: Request, res: Response, next: NextFunction) => next();
+  }
 
-  // Log request
-  logger.info({
-    type: 'audit',
-    event: 'request',
-    ip: req.ip,
-    method: req.method,
-    path: req.path,
-    userAgent: req.headers['user-agent'],
-    user: (req as any).user,
-  });
+  return (req: Request, res: Response, next: NextFunction) => {
+    const clientIp = req.ip || req.connection.remoteAddress;
+    
+    if (!clientIp || !whitelist.includes(clientIp)) {
+      logger.warn('IP not whitelisted', { 
+        ip: clientIp, 
+        whitelist,
+        path: req.path,
+      });
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'Your IP address is not authorized',
+      });
+    }
 
-  // Log response
-  res.on('finish', () => {
-    const duration = Date.now() - startTime;
-    logger.info({
-      type: 'audit',
-      event: 'response',
-      ip: req.ip,
-      method: req.method,
-      path: req.path,
-      statusCode: res.statusCode,
-      duration,
-      user: (req as any).user,
-    });
-  });
+    next();
+  };
+}
 
-  next();
-};
+/**
+ * Request validation middleware
+ */
+export function createRequestValidationMiddleware() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    // Validate request size
+    const contentLength = req.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > 10 * 1024 * 1024) { // 10MB limit
+      logger.warn('Request too large', { 
+        contentLength, 
+        ip: req.ip,
+        path: req.path,
+      });
+      return res.status(413).json({
+        error: 'Payload too large',
+        message: 'Request body exceeds maximum size limit',
+      });
+    }
 
-// Combined security middleware
-export const security = [
-  securityHeaders,
-  corsOptions,
-  compressionMiddleware,
-  sanitizeRequest,
-  requestSizeLimit('10mb'),
-]; 
+    // Validate content type for POST/PUT requests
+    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+      const contentType = req.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        return res.status(415).json({
+          error: 'Unsupported media type',
+          message: 'Content-Type must be application/json',
+        });
+      }
+    }
+
+    next();
+  };
+} 

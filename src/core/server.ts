@@ -22,7 +22,7 @@ export async function createServer(config: Config): Promise<MCPServer> {
   // Initialize services
   const statesetClient = new StateSetClient(config);
   const metricsCollector = config.features.enableMetrics 
-    ? new MetricsCollector() 
+    ? new MetricsCollector(config) 
     : undefined;
 
   // Create MCP server instance

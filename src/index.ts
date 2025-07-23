@@ -21,21 +21,30 @@ async function main(): Promise<void> {
 
     // Setup graceful shutdown
     gracefulShutdown(server);
+    
+    // Log startup completion
+    logger.info({
+      name: config.server.name,
+      version: config.server.version,
+      logLevel: config.server.logLevel,
+      metricsEnabled: config.features.enableMetrics,
+    }, 'Server startup completed');
+    
   } catch (error) {
-    logger.error({ error }, 'Failed to start server');
+    logger.error(`Failed to start server: ${error instanceof Error ? error.message : 'Unknown error'}`);
     process.exit(1);
   }
 }
 
 // Handle unhandled rejections
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error({ reason, promise }, 'Unhandled Rejection');
+  logger.error(`Unhandled Rejection: ${reason instanceof Error ? reason.message : reason}`);
   process.exit(1);
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  logger.error({ error }, 'Uncaught Exception');
+  logger.error(`Uncaught Exception: ${error.message}`);
   process.exit(1);
 });
 

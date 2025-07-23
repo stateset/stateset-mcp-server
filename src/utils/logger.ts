@@ -1,233 +1,164 @@
-import pino, { Logger as PinoLogger } from 'pino';
-import { config } from '@config/index';
+import pino from 'pino';
 
-// Custom log levels
-const customLevels = {
-  trace: 10,
-  debug: 20,
-  info: 30,
-  warn: 40,
-  error: 50,
-  fatal: 60,
-  metric: 35, // Custom level for metrics
-};
+// Get log level from environment
+const logLevel = process.env.LOG_LEVEL || 'info';
 
-// Create base logger configuration
-const baseConfig: pino.LoggerOptions = {
-  level: config.server.logLevel,
-  customLevels,
+// Create base logger
+const baseLogger = pino({
+  level: logLevel,
   timestamp: pino.stdTimeFunctions.isoTime,
   formatters: {
-    level: (label) => ({ level: label }),
-    bindings: (bindings) => ({
-      pid: bindings.pid,
-      hostname: bindings.hostname,
-      service: config.server.name,
-      version: config.server.version,
-      environment: config.server.environment,
-    }),
+    level: (label) => {
+      return { level: label };
+    },
   },
   serializers: {
     error: pino.stdSerializers.err,
-    request: (req) => ({
-      method: req.method,
-      url: req.url,
-      headers: req.headers,
-      params: req.params,
-    }),
-    response: (res) => ({
-      statusCode: res.statusCode,
-      headers: res.headers,
-    }),
   },
-};
-
-// Development-specific configuration
-const devConfig: pino.LoggerOptions = {
-  ...baseConfig,
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      translateTime: 'HH:MM:ss Z',
-      ignore: 'pid,hostname',
-      messageFormat: '{msg}',
-      errorLikeObjectKeys: ['err', 'error'],
-    },
+  redact: {
+    paths: ['req.headers.authorization', 'api_key', 'password', 'token'],
+    censor: '[REDACTED]',
   },
-};
+});
 
-// Create the base logger
-const baseLogger = config.server.environment === 'development' 
-  ? pino(devConfig)
-  : pino(baseConfig);
-
-// Logger context management
-interface LogContext {
-  requestId?: string;
-  userId?: string;
-  operation?: string;
-  [key: string]: any;
+// Logger interface for consistency - supports both string and structured logging
+export interface Logger {
+  trace(msg: string, obj?: any): void;
+  trace(obj: any, msg?: string): void;
+  debug(msg: string, obj?: any): void;
+  debug(obj: any, msg?: string): void;
+  info(msg: string, obj?: any): void;
+  info(obj: any, msg?: string): void;
+  warn(msg: string, obj?: any): void;
+  warn(obj: any, msg?: string): void;
+  error(msg: string, error?: string | Error | undefined): void;
+  error(obj: any, msg?: string): void;
+  fatal(msg: string, error?: string | Error | undefined): void;
+  fatal(obj: any, msg?: string): void;
+  
+  // Custom methods for specific logging patterns
+  logCacheHit(key: string): void;
+  logCacheMiss(key: string): void;
+  logCircuitBreakerOpen(name: string): void;
+  logCircuitBreakerClose(name: string): void;
+  logHealthCheck(status: string, details: any): void;
+  metric(name: string, value: number, labels?: Record<string, string>): void;
+  startTimer(name: string): { end: () => void };
 }
 
-class Logger {
-  private logger: PinoLogger;
-  private context: LogContext;
+// Enhanced logger implementation
+class EnhancedLogger implements Logger {
+  constructor(private readonly logger: pino.Logger) {}
 
-  constructor(context: LogContext = {}) {
-    this.logger = baseLogger;
-    this.context = context;
-  }
-
-  // Create a child logger with additional context
-  child(context: LogContext): Logger {
-    const newLogger = new Logger({ ...this.context, ...context });
-    newLogger.logger = this.logger.child(context);
-    return newLogger;
-  }
-
-  // Logging methods
-  trace(msg: string, data?: any): void {
-    this.logger.trace({ ...this.context, ...data }, msg);
-  }
-
-  debug(msg: string, data?: any): void {
-    this.logger.debug({ ...this.context, ...data }, msg);
-  }
-
-  info(msg: string, data?: any): void {
-    this.logger.info({ ...this.context, ...data }, msg);
-  }
-
-  warn(msg: string, data?: any): void {
-    this.logger.warn({ ...this.context, ...data }, msg);
-  }
-
-  error(msg: string, error?: Error | any, data?: any): void {
-    if (error instanceof Error) {
-      this.logger.error({ ...this.context, ...data, error }, msg);
+  trace(objOrMsg: any, msg?: string): void {
+    if (typeof objOrMsg === 'string') {
+      this.logger.trace(msg || {}, objOrMsg);
     } else {
-      this.logger.error({ ...this.context, ...data, ...error }, msg);
+      this.logger.trace(objOrMsg, msg || '');
     }
   }
 
-  fatal(msg: string, error?: Error | any, data?: any): void {
-    if (error instanceof Error) {
-      this.logger.fatal({ ...this.context, ...data, error }, msg);
+  debug(objOrMsg: any, msg?: string): void {
+    if (typeof objOrMsg === 'string') {
+      this.logger.debug(msg || {}, objOrMsg);
     } else {
-      this.logger.fatal({ ...this.context, ...data, ...error }, msg);
+      this.logger.debug(objOrMsg, msg || '');
     }
   }
 
-  // Metric logging
-  metric(name: string, value: number, tags?: Record<string, string>): void {
-    (this.logger as any).metric({
-      ...this.context,
-      metric: {
-        name,
-        value,
-        tags: { ...tags },
-        timestamp: new Date().toISOString(),
-      },
-    }, `Metric: ${name}`);
+  info(objOrMsg: any, msg?: string): void {
+    if (typeof objOrMsg === 'string') {
+      this.logger.info(msg || {}, objOrMsg);
+    } else {
+      this.logger.info(objOrMsg, msg || '');
+    }
   }
 
-  // Performance timing
-  startTimer(operation: string): () => void {
-    const start = process.hrtime.bigint();
-    return () => {
-      const end = process.hrtime.bigint();
-      const duration = Number(end - start) / 1_000_000; // Convert to milliseconds
-      this.metric(`${operation}.duration`, duration, { operation });
-      this.debug(`${operation} completed`, { duration_ms: duration });
-    };
+  warn(objOrMsg: any, msg?: string): void {
+    if (typeof objOrMsg === 'string') {
+      this.logger.warn(msg || {}, objOrMsg);
+    } else {
+      this.logger.warn(objOrMsg, msg || '');
+    }
   }
 
-  // Structured API logging
-  logApiRequest(method: string, endpoint: string, params?: any): void {
-    this.info('API request initiated', {
-      api: {
-        method,
-        endpoint,
-        params,
-      },
-    });
+  error(objOrMsg: any, errorOrMsg?: string | Error): void {
+    if (typeof objOrMsg === 'string') {
+      // objOrMsg is the message, errorOrMsg is the error
+      const errorInfo = errorOrMsg ? 
+        { error: errorOrMsg instanceof Error ? errorOrMsg.message : errorOrMsg } : 
+        {};
+      this.logger.error(errorInfo, objOrMsg);
+    } else {
+      // objOrMsg is the context object, errorOrMsg is the message
+      this.logger.error(objOrMsg, errorOrMsg || '');
+    }
   }
 
-  logApiResponse(method: string, endpoint: string, statusCode: number, duration: number): void {
-    const level = statusCode >= 400 ? 'error' : 'info';
-    this[level]('API request completed', {
-      api: {
-        method,
-        endpoint,
-        statusCode,
-        duration_ms: duration,
-      },
-    });
+  fatal(objOrMsg: any, errorOrMsg?: string | Error): void {
+    if (typeof objOrMsg === 'string') {
+      // objOrMsg is the message, errorOrMsg is the error
+      const errorInfo = errorOrMsg ? 
+        { error: errorOrMsg instanceof Error ? errorOrMsg.message : errorOrMsg } : 
+        {};
+      this.logger.fatal(errorInfo, objOrMsg);
+    } else {
+      // objOrMsg is the context object, errorOrMsg is the message
+      this.logger.fatal(objOrMsg, errorOrMsg || '');
+    }
   }
 
-  logApiError(method: string, endpoint: string, error: Error, duration: number): void {
-    this.error('API request failed', error, {
-      api: {
-        method,
-        endpoint,
-        duration_ms: duration,
-      },
-    });
-  }
-
-  // Rate limiting logs
-  logRateLimit(operation: string, metrics: any): void {
-    this.debug('Rate limit status', {
-      rateLimit: {
-        operation,
-        ...metrics,
-      },
-    });
-  }
-
-  // Cache logs
+  // Cache-specific logging
   logCacheHit(key: string): void {
-    this.debug('Cache hit', { cache: { key, hit: true } });
+    this.logger.debug({ cache: 'hit', key }, 'Cache hit');
   }
 
   logCacheMiss(key: string): void {
-    this.debug('Cache miss', { cache: { key, hit: false } });
+    this.logger.debug({ cache: 'miss', key }, 'Cache miss');
   }
 
-  // Circuit breaker logs
-  logCircuitBreakerOpen(service: string): void {
-    this.warn('Circuit breaker opened', { circuitBreaker: { service, state: 'open' } });
+  // Circuit breaker logging
+  logCircuitBreakerOpen(name: string): void {
+    this.logger.warn({ circuitBreaker: name, state: 'open' }, 'Circuit breaker opened');
   }
 
-  logCircuitBreakerClose(service: string): void {
-    this.info('Circuit breaker closed', { circuitBreaker: { service, state: 'closed' } });
+  logCircuitBreakerClose(name: string): void {
+    this.logger.info({ circuitBreaker: name, state: 'closed' }, 'Circuit breaker closed');
   }
 
-  // Health check logs
-  logHealthCheck(status: 'healthy' | 'unhealthy', details: any): void {
-    const level = status === 'healthy' ? 'info' : 'error';
-    this[level]('Health check', { healthCheck: { status, ...details } });
+  // Health check logging
+  logHealthCheck(status: string, details: any): void {
+    this.logger.info({ healthCheck: status, ...details }, `Health check ${status}`);
+  }
+
+  // Metrics logging
+  metric(name: string, value: number, labels?: Record<string, string>): void {
+    this.logger.debug({ metric: name, value, labels }, 'Metric recorded');
+  }
+
+  // Timer functionality
+  startTimer(name: string): { end: () => void } {
+    const start = process.hrtime.bigint();
+    return {
+      end: () => {
+        const end = process.hrtime.bigint();
+        const duration = Number(end - start) / 1000000; // Convert to milliseconds
+        this.logger.debug({ timer: name, duration }, 'Timer completed');
+      }
+    };
   }
 }
 
-// Create and export default logger instance
-export const logger = new Logger();
-
-// Export Logger class for creating custom instances
-export { Logger };
-
-// Utility function to create a logger for a specific module
-export function createLogger(module: string, context?: LogContext): Logger {
-  return logger.child({ module, ...context });
+/**
+ * Create a child logger with the given name
+ */
+export function createLogger(name: string): Logger {
+  const childLogger = baseLogger.child({ component: name });
+  return new EnhancedLogger(childLogger);
 }
 
-// Request-scoped logger factory
-export function createRequestLogger(requestId: string, userId?: string): Logger {
-  return logger.child({ requestId, userId });
-}
+// Create the main logger instance
+export const logger = createLogger('main');
 
-// Operation-scoped logger factory
-export function createOperationLogger(operation: string, context?: LogContext): Logger {
-  return logger.child({ operation, ...context });
-} 
+// Export default logger
+export default logger; 
