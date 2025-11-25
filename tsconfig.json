@@ -38,8 +38,10 @@
     "coverage",
     "**/*.test.ts",
     "**/*.spec.ts",
+    // Optional HTTP/Express features (stdio transport doesn't need these)
     "src/middleware/security.ts",
     "src/middleware/api-docs.ts",
+    // Experimental/Advanced features (disabled by default)
     "src/core/realtime-manager.ts",
     "src/core/intelligent-cache.ts",
     "src/core/openapi-converter.ts",

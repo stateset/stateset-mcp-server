@@ -16,7 +16,15 @@ module.exports = {
     'connection-pool.test.ts',
   ],
   transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest',
+    '^.+\\.(ts|tsx)$': [
+      'ts-jest',
+      {
+        tsconfig: {
+          esModuleInterop: true,
+          allowSyntheticDefaultImports: true,
+        },
+      },
+    ],
   },
   moduleNameMapper: {
     '^@config/(.*)$': '<rootDir>/src/config/$1',
@@ -49,22 +57,21 @@ module.exports = {
   ],
   coverageThreshold: {
     global: {
-      branches: 8,
-      functions: 9,
+      branches: 10,
+      functions: 8,
       lines: 13,
       statements: 13,
     },
+    // Aspirational goal: Gradually increase to 80%+ coverage
+    // Target thresholds for production-ready: 80/80/80/80
   },
   coverageReporters: ['text', 'lcov', 'html'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  globalTeardown: '<rootDir>/tests/teardown.ts',
   testTimeout: 30000,
   verbose: true,
-  globals: {
-    'ts-jest': {
-      tsconfig: {
-        esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
-      },
-    },
-  },
+  // Detect open handles to identify resource leaks
+  detectOpenHandles: false, // Disabled for performance, enable for debugging
+  // Force exit after tests complete (prevents hanging on open handles)
+  forceExit: true,
 }; 

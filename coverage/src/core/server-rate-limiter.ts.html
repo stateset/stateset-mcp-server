@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/125</span>
+                <span class='fraction'>0/131</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/37</span>
+                <span class='fraction'>0/40</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/115</span>
+                <span class='fraction'>0/120</span>
             </div>
         
             
@@ -352,7 +352,14 @@
 <a name='L287'></a><a href='#L287'>287</a>
 <a name='L288'></a><a href='#L288'>288</a>
 <a name='L289'></a><a href='#L289'>289</a>
-<a name='L290'></a><a href='#L290'>290</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -558,6 +565,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -574,7 +582,10 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -612,9 +623,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -842,7 +856,8 @@ export interface ToolRateLimitMetrics {
 &nbsp;
   // Refill tokens based on elapsed time
   private <span class="fstat-no" title="function not covered" >refillTokens(</span>category: ToolCategory): void {
-    const bucket = <span class="cstat-no" title="statement not covered" >this.buckets.get(category)!;</span>
+    const bucket = <span class="cstat-no" title="statement not covered" >this.buckets.get(category);</span>
+<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (!bucket) <span class="cstat-no" title="statement not covered" >return;</span></span>
     const config = <span class="cstat-no" title="statement not covered" >this.limits[category];</span>
     const now = <span class="cstat-no" title="statement not covered" >Date.now();</span>
     const elapsedMs = <span class="cstat-no" title="statement not covered" >now - bucket.lastRefill;</span>
@@ -863,7 +878,10 @@ export interface ToolRateLimitMetrics {
     const category = <span class="cstat-no" title="statement not covered" >this.categorize(toolName);</span>
 <span class="cstat-no" title="statement not covered" >    this.refillTokens(category);</span>
 &nbsp;
-    const bucket = <span class="cstat-no" title="statement not covered" >this.buckets.get(category)!;</span>
+    const bucket = <span class="cstat-no" title="statement not covered" >this.buckets.get(category);</span>
+<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (!bucket) {</span>
+<span class="cstat-no" title="statement not covered" >      return { allowed: false, waitTimeMs: 1000, category };</span>
+    }
     const config = <span class="cstat-no" title="statement not covered" >this.limits[category];</span>
 &nbsp;
     // Check if we have tokens available
@@ -903,7 +921,10 @@ export interface ToolRateLimitMetrics {
   ): ToolRateLimitMetrics | Record&lt;ToolCategory, ToolRateLimitMetrics&gt; {
 <span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (category) {</span>
 <span class="cstat-no" title="statement not covered" >      this.refillTokens(category);</span>
-      const bucket = <span class="cstat-no" title="statement not covered" >this.buckets.get(category)!;</span>
+      const bucket = <span class="cstat-no" title="statement not covered" >this.buckets.get(category);</span>
+<span class="cstat-no" title="statement not covered" >      <span class="missing-if-branch" title="if path not taken" >I</span>if (!bucket) {</span>
+<span class="cstat-no" title="statement not covered" >        throw new Error(`No bucket found for category: ${category}`);</span>
+      }
       const lastTimestamp = <span class="cstat-no" title="statement not covered" >bucket.requestTimestamps[bucket.requestTimestamps.length - 1];</span>
 <span class="cstat-no" title="statement not covered" >      return {</span>
         category,
@@ -937,7 +958,7 @@ export const <span class="cstat-no" title="statement not covered" >toolRateLimit
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-25T17:53:57.465Z
+                at 2025-11-25T19:42:44.818Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

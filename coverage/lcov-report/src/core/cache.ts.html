@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">57.76% </span>
+                <span class="strong">56.54% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>93/161</span>
+                <span class='fraction'>95/168</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">55% </span>
+                <span class="strong">51.16% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>22/40</span>
+                <span class='fraction'>22/43</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">58.49% </span>
+                <span class="strong">57.92% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>93/159</span>
+                <span class='fraction'>95/164</span>
             </div>
         
             
@@ -469,7 +469,13 @@
 <a name='L404'></a><a href='#L404'>404</a>
 <a name='L405'></a><a href='#L405'>405</a>
 <a name='L406'></a><a href='#L406'>406</a>
-<a name='L407'></a><a href='#L407'>407</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L407'></a><a href='#L407'>407</a>
+<a name='L408'></a><a href='#L408'>408</a>
+<a name='L409'></a><a href='#L409'>409</a>
+<a name='L410'></a><a href='#L410'>410</a>
+<a name='L411'></a><a href='#L411'>411</a>
+<a name='L412'></a><a href='#L412'>412</a>
+<a name='L413'></a><a href='#L413'>413</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
@@ -626,6 +632,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -684,6 +691,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -736,6 +744,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">28x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1032,7 +1044,8 @@ class LRUCache&lt;T&gt; extends CacheStrategy&lt;T&gt; {
 <span class="fstat-no" title="function not covered" >  evict(</span>): void {
 <span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (this.accessOrder.length === 0) <span class="cstat-no" title="statement not covered" >return;</span></span>
 &nbsp;
-    const keyToEvict = <span class="cstat-no" title="statement not covered" >this.accessOrder.shift()!;</span>
+    const keyToEvict = <span class="cstat-no" title="statement not covered" >this.accessOrder.shift();</span>
+<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (!keyToEvict) <span class="cstat-no" title="statement not covered" >return;</span></span>
 <span class="cstat-no" title="statement not covered" >    this.delete(keyToEvict);</span>
 <span class="cstat-no" title="statement not covered" >    this.stats.evictions++;</span>
 <span class="cstat-no" title="statement not covered" >    logger.debug('LRU eviction', { key: keyToEvict });</span>
@@ -1086,7 +1099,8 @@ class FIFOCache&lt;T&gt; extends CacheStrategy&lt;T&gt; {
 <span class="fstat-no" title="function not covered" >  evict(</span>): void {
 <span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (this.insertOrder.length === 0) <span class="cstat-no" title="statement not covered" >return;</span></span>
 &nbsp;
-    const keyToEvict = <span class="cstat-no" title="statement not covered" >this.insertOrder.shift()!;</span>
+    const keyToEvict = <span class="cstat-no" title="statement not covered" >this.insertOrder.shift();</span>
+<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (!keyToEvict) <span class="cstat-no" title="statement not covered" >return;</span></span>
 <span class="cstat-no" title="statement not covered" >    this.delete(keyToEvict);</span>
 <span class="cstat-no" title="statement not covered" >    this.stats.evictions++;</span>
 <span class="cstat-no" title="statement not covered" >    logger.debug('FIFO eviction', { key: keyToEvict });</span>
@@ -1143,7 +1157,11 @@ export class CacheManager {
         maxSize: size,
       });
     }
-    return this.caches.get(namespace)!;
+    const cache = this.caches.get(namespace);
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!cache) {
+<span class="cstat-no" title="statement not covered" >      throw new Error(`Cache namespace ${namespace} not found`);</span>
+    }
+    return cache;
   }
 &nbsp;
   // Cache operations with namespace
@@ -1288,7 +1306,7 @@ export type { CacheStats, CacheEntry };
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-25T17:53:57.409Z
+                at 2025-11-25T19:42:44.734Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

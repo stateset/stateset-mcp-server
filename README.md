@@ -4,8 +4,18 @@
 [![codecov](https://codecov.io/gh/stateset/mcp-server/branch/master/graph/badge.svg)](https://codecov.io/gh/stateset/mcp-server)
 [![npm version](https://badge.fury.io/js/stateset-mcp-server.svg)](https://badge.fury.io/js/stateset-mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
+[![Code Style: Prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)](https://prettier.io/)
 
 A world-class Model Context Protocol (MCP) server for StateSet API integration, providing comprehensive e-commerce operations management through a standardized interface.
+
+## 📖 Documentation
+
+- **[Architecture Guide](./ARCHITECTURE.md)** - System design and component overview
+- **[Testing Guide](./TESTING.md)** - Testing strategy and coverage
+- **[API Documentation](./docs/api)** - Generated TypeDoc API reference
+- **[Contributing Guide](./CONTRIBUTING.md)** - How to contribute
 
 ## 🚀 Features
 
@@ -159,19 +169,17 @@ The server exposes 100+ tools organized by domain:
 - `stateset_update_order` - Update order details
 - `stateset_get_order` - Retrieve order information
 - `stateset_list_orders` - List orders with pagination
-- [View all order tools →](docs/tools/orders.md)
+- And 90+ more tools for complete e-commerce operations
 
 #### Inventory & Products
 - `stateset_create_product` - Add a new product
 - `stateset_update_inventory` - Update inventory levels
 - `stateset_get_product` - Get product details
-- [View all inventory tools →](docs/tools/inventory.md)
 
 #### Financial
 - `stateset_create_invoice` - Generate an invoice
 - `stateset_process_payment` - Process a payment
 - `stateset_list_transactions` - List financial transactions
-- [View all financial tools →](docs/tools/financial.md)
 
 ### Resources
 
