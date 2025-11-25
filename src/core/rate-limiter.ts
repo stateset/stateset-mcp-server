@@ -72,7 +72,7 @@ class TokenBucketStrategy extends RateLimiterStrategy {
     this.tokens = maxTokens;
     this.refillRate = refillRate;
     this.lastRefill = Date.now();
-    
+
     // Start refill timer
     this.startRefillTimer();
   }
@@ -105,7 +105,7 @@ class TokenBucketStrategy extends RateLimiterStrategy {
     const now = Date.now();
     const timePassed = now - this.lastRefill;
     const tokensToAdd = (timePassed / 1000) * this.refillRate;
-    
+
     this.tokens = Math.min(this.maxTokens, this.tokens + tokensToAdd);
     this.lastRefill = now;
   }
@@ -140,7 +140,7 @@ class SlidingWindowStrategy extends RateLimiterStrategy {
     super();
     this.windowSize = windowSize;
     this.maxRequests = maxRequests;
-    
+
     // Start cleanup timer
     this.startCleanupTimer();
   }
@@ -152,14 +152,14 @@ class SlidingWindowStrategy extends RateLimiterStrategy {
 
   consume(): void {
     this.cleanup();
-    
+
     if (this.requests.length < this.maxRequests) {
       this.requests.push(Date.now());
       this.metrics.acceptedRequests++;
     } else {
       this.metrics.rejectedRequests++;
     }
-    
+
     this.metrics.totalRequests++;
     this.updateMetrics();
   }
@@ -174,7 +174,7 @@ class SlidingWindowStrategy extends RateLimiterStrategy {
 
   private cleanup(): void {
     const cutoff = Date.now() - this.windowSize;
-    this.requests = this.requests.filter(time => time > cutoff);
+    this.requests = this.requests.filter((time) => time > cutoff);
   }
 
   private startCleanupTimer(): void {
@@ -200,13 +200,13 @@ class AdaptiveStrategy extends RateLimiterStrategy {
     initialTokens: number,
     initialRate: number,
     targetResponseTime: number = 1000,
-    adjustmentFactor: number = 0.1
+    adjustmentFactor: number = 0.1,
   ) {
     super();
     this.tokenBucket = new TokenBucketStrategy(initialTokens, initialRate);
     this.targetResponseTime = targetResponseTime;
     this.adjustmentFactor = adjustmentFactor;
-    
+
     // Start adjustment timer
     this.startAdjustmentTimer();
   }
@@ -234,8 +234,9 @@ class AdaptiveStrategy extends RateLimiterStrategy {
   private adjustRate(): void {
     if (this.responseTimes.length < 10) return;
 
-    const avgResponseTime = this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length;
-    
+    const avgResponseTime =
+      this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length;
+
     if (avgResponseTime > this.targetResponseTime) {
       // Slow down
       const currentRate = this.tokenBucket.getRefillRate();
@@ -267,7 +268,7 @@ export class RateLimiter {
 
   constructor(strategy: Strategy = Strategy.TOKEN_BUCKET) {
     this.strategy = this.createStrategy(strategy);
-    
+
     // Listen to strategy events
     this.strategy.on('refill', () => this.processQueue());
     this.strategy.on('cleanup', () => this.processQueue());
@@ -277,7 +278,7 @@ export class RateLimiter {
     fn: () => Promise<T>,
     operation: string,
     priority: Priority = Priority.NORMAL,
-    retries: number = config.rateLimit.retryAttempts
+    retries: number = config.rateLimit.retryAttempts,
   ): Promise<T> {
     return new Promise((resolve, reject) => {
       const request: Request<T> = {
@@ -305,7 +306,7 @@ export class RateLimiter {
         break;
       }
     }
-    
+
     if (!inserted) {
       this.queue.push(request);
     }
@@ -320,20 +321,20 @@ export class RateLimiter {
 
   private async processQueue(): Promise<void> {
     if (this.processing || this.queue.length === 0) return;
-    
+
     this.processing = true;
 
     while (this.queue.length > 0 && this.strategy.canProceed()) {
       const request = this.queue.shift()!;
       const waitTime = Date.now() - request.timestamp;
       this.waitTimes.push(waitTime);
-      
+
       if (this.waitTimes.length > 100) {
         this.waitTimes.shift();
       }
 
       this.strategy.consume();
-      
+
       // Execute request
       this.executeRequest(request, waitTime);
     }
@@ -343,36 +344,40 @@ export class RateLimiter {
 
   private async executeRequest<T>(request: Request<T>, waitTime: number): Promise<void> {
     const timer = logger.startTimer(`rate_limiter.${request.operation}`);
-    
+
     try {
       const result = await request.fn();
       timer();
-      
+
       // Record response time for adaptive strategy
       if (this.strategy instanceof AdaptiveStrategy) {
         const duration = Date.now() - request.timestamp;
         this.strategy.recordResponseTime(duration);
       }
-      
+
       request.resolve(result);
     } catch (error) {
       timer();
-      
+
       if (request.retries > 0 && this.isRetryableError(error)) {
         logger.debug('Retrying request', {
           operation: request.operation,
           retriesLeft: request.retries,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
-        
+
         // Re-enqueue with reduced retries
         request.retries--;
         request.timestamp = Date.now();
-        
+
         // Add exponential backoff
-        setTimeout(() => {
-          this.enqueue(request);
-        }, Math.pow(2, config.rateLimit.retryAttempts - request.retries) * config.rateLimit.retryDelay);
+        setTimeout(
+          () => {
+            this.enqueue(request);
+          },
+          Math.pow(2, config.rateLimit.retryAttempts - request.retries) *
+            config.rateLimit.retryDelay,
+        );
       } else {
         logger.error('Request failed', error, {
           operation: request.operation,
@@ -396,35 +401,36 @@ export class RateLimiter {
       case Strategy.TOKEN_BUCKET:
         return new TokenBucketStrategy(
           config.rateLimit.burstSize,
-          config.rateLimit.requestsPerMinute / 60
+          config.rateLimit.requestsPerMinute / 60,
         );
-      
+
       case Strategy.SLIDING_WINDOW:
         return new SlidingWindowStrategy(
           60000, // 1 minute window
-          config.rateLimit.requestsPerMinute
+          config.rateLimit.requestsPerMinute,
         );
-      
+
       case Strategy.ADAPTIVE:
         return new AdaptiveStrategy(
           config.rateLimit.burstSize,
-          config.rateLimit.requestsPerMinute / 60
+          config.rateLimit.requestsPerMinute / 60,
         );
-      
+
       default:
         logger.warn(`Unknown rate limiter strategy: ${strategy}, defaulting to token bucket`);
         return new TokenBucketStrategy(
           config.rateLimit.burstSize,
-          config.rateLimit.requestsPerMinute / 60
+          config.rateLimit.requestsPerMinute / 60,
         );
     }
   }
 
   getMetrics(): RateLimiterMetrics & { averageWaitTime: number } {
     const metrics = this.strategy.getMetrics();
-    const avgWaitTime = this.waitTimes.length > 0
-      ? this.waitTimes.reduce((a, b) => a + b, 0) / this.waitTimes.length
-      : 0;
+    const avgWaitTime =
+      this.waitTimes.length > 0
+        ? this.waitTimes.reduce((a, b) => a + b, 0) / this.waitTimes.length
+        : 0;
 
     return {
       ...metrics,
@@ -437,21 +443,21 @@ export class RateLimiter {
   changeStrategy(strategy: Strategy): void {
     const oldMetrics = this.strategy.getMetrics();
     this.strategy = this.createStrategy(strategy);
-    
+
     // Transfer metrics
     this.strategy['metrics'] = oldMetrics;
-    
+
     logger.info('Rate limiter strategy changed', { newStrategy: strategy });
   }
 
   // Clear the queue
   clearQueue(): void {
     const clearedCount = this.queue.length;
-    this.queue.forEach(request => {
+    this.queue.forEach((request) => {
       request.reject(new Error('Queue cleared'));
     });
     this.queue = [];
-    
+
     logger.info('Rate limiter queue cleared', { clearedCount });
   }
 }
@@ -460,4 +466,4 @@ export class RateLimiter {
 export const rateLimiter = new RateLimiter();
 
 // Export for custom instances
-export { Strategy as RateLimiterStrategy }; 
+export { Strategy as RateLimiterStrategy };

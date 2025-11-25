@@ -77,7 +77,7 @@ class Histogram {
 
   constructor(buckets: number[] = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]) {
     this.buckets = buckets.sort((a, b) => a - b);
-    this.buckets.forEach(bucket => this.bucketCounts.set(bucket, 0));
+    this.buckets.forEach((bucket) => this.bucketCounts.set(bucket, 0));
   }
 
   observe(value: number): void {
@@ -104,7 +104,7 @@ class Histogram {
 
   getQuantile(quantile: number): number {
     if (this.values.length === 0) return 0;
-    
+
     const sorted = [...this.values].sort((a, b) => a - b);
     const index = Math.ceil(quantile * sorted.length) - 1;
     return sorted[Math.max(0, index)] ?? 0;
@@ -123,7 +123,7 @@ class Histogram {
     this.sum = 0;
     this.count = 0;
     this.bucketCounts.clear();
-    this.buckets.forEach(bucket => this.bucketCounts.set(bucket, 0));
+    this.buckets.forEach((bucket) => this.bucketCounts.set(bucket, 0));
   }
 }
 
@@ -154,14 +154,14 @@ class Summary {
 
   getQuantiles(quantiles: number[]): Map<number, number> {
     const result = new Map<number, number>();
-    
+
     if (this.values.length === 0) {
-      quantiles.forEach(q => result.set(q, 0));
+      quantiles.forEach((q) => result.set(q, 0));
       return result;
     }
 
     const sorted = [...this.values].sort((a, b) => a - b);
-    
+
     for (const quantile of quantiles) {
       const index = Math.ceil(quantile * sorted.length) - 1;
       result.set(quantile, sorted[Math.max(0, index)] ?? 0);
@@ -191,12 +191,13 @@ export class MetricsCollector extends EventEmitter {
   private gauges: Map<string, number> = new Map();
   private histograms: Map<string, Histogram> = new Map();
   private summaries: Map<string, Summary> = new Map();
-  private metricMetadata: Map<string, { type: MetricType; help: string; labels: Labels }> = new Map();
+  private metricMetadata: Map<string, { type: MetricType; help: string; labels: Labels }> =
+    new Map();
   private collectionInterval?: NodeJS.Timeout;
 
   constructor() {
     super();
-    
+
     if (config.monitoring.enabled) {
       this.startCollection();
     }
@@ -207,7 +208,7 @@ export class MetricsCollector extends EventEmitter {
     const key = this.getKey(name, labels);
     const current = this.counters.get(key) || 0;
     this.counters.set(key, current + value);
-    
+
     this.metricMetadata.set(key, {
       type: MetricType.COUNTER,
       help: `Counter for ${name}`,
@@ -219,7 +220,7 @@ export class MetricsCollector extends EventEmitter {
   set(name: string, value: number, labels: Labels = {}): void {
     const key = this.getKey(name, labels);
     this.gauges.set(key, value);
-    
+
     this.metricMetadata.set(key, {
       type: MetricType.GAUGE,
       help: `Gauge for ${name}`,
@@ -240,7 +241,7 @@ export class MetricsCollector extends EventEmitter {
   // Histogram operations
   observe(name: string, value: number, labels: Labels = {}): void {
     const key = this.getKey(name, labels);
-    
+
     if (!this.histograms.has(key)) {
       this.histograms.set(key, new Histogram());
       this.metricMetadata.set(key, {
@@ -249,14 +250,14 @@ export class MetricsCollector extends EventEmitter {
         labels,
       });
     }
-    
+
     this.histograms.get(key)!.observe(value);
   }
 
   // Summary operations
   observe_summary(name: string, value: number, labels: Labels = {}): void {
     const key = this.getKey(name, labels);
-    
+
     if (!this.summaries.has(key)) {
       this.summaries.set(key, new Summary());
       this.metricMetadata.set(key, {
@@ -265,14 +266,14 @@ export class MetricsCollector extends EventEmitter {
         labels,
       });
     }
-    
+
     this.summaries.get(key)!.observe(value);
   }
 
   // Timer helper
   startTimer(name: string, labels: Labels = {}): () => void {
     const start = process.hrtime.bigint();
-    
+
     return () => {
       const end = process.hrtime.bigint();
       const duration = Number(end - start) / 1_000_000; // Convert to milliseconds
@@ -289,7 +290,7 @@ export class MetricsCollector extends EventEmitter {
     for (const [key, value] of this.counters.entries()) {
       const metadata = this.metricMetadata.get(key)!;
       const [name] = this.parseKey(key);
-      
+
       metrics.push({
         name,
         type: MetricType.COUNTER,
@@ -304,7 +305,7 @@ export class MetricsCollector extends EventEmitter {
     for (const [key, value] of this.gauges.entries()) {
       const metadata = this.metricMetadata.get(key)!;
       const [name] = this.parseKey(key);
-      
+
       metrics.push({
         name,
         type: MetricType.GAUGE,
@@ -319,7 +320,7 @@ export class MetricsCollector extends EventEmitter {
     for (const [key, histogram] of this.histograms.entries()) {
       const metadata = this.metricMetadata.get(key)!;
       const [name] = this.parseKey(key);
-      
+
       metrics.push({
         name,
         type: MetricType.HISTOGRAM,
@@ -336,7 +337,7 @@ export class MetricsCollector extends EventEmitter {
     for (const [key, summary] of this.summaries.entries()) {
       const metadata = this.metricMetadata.get(key)!;
       const [name] = this.parseKey(key);
-      
+
       metrics.push({
         name,
         type: MetricType.SUMMARY,
@@ -354,8 +355,9 @@ export class MetricsCollector extends EventEmitter {
 
   // Get aggregated metrics
   getAggregatedMetrics(name: string): MetricAggregation | null {
-    const histogram = Array.from(this.histograms.entries())
-      .find(([key]) => this.parseKey(key)[0] === name)?.[1];
+    const histogram = Array.from(this.histograms.entries()).find(
+      ([key]) => this.parseKey(key)[0] === name,
+    )?.[1];
 
     if (!histogram) return null;
 
@@ -394,16 +396,22 @@ export class MetricsCollector extends EventEmitter {
 
         case MetricType.HISTOGRAM:
           for (const [bucket, count] of metric.buckets.entries()) {
-            lines.push(`${metric.name}_bucket{le="${bucket}"${labelStr ? ',' + labelStr : ''}} ${count}`);
+            lines.push(
+              `${metric.name}_bucket{le="${bucket}"${labelStr ? ',' + labelStr : ''}} ${count}`,
+            );
           }
-          lines.push(`${metric.name}_bucket{le="+Inf"${labelStr ? ',' + labelStr : ''}} ${metric.count}`);
+          lines.push(
+            `${metric.name}_bucket{le="+Inf"${labelStr ? ',' + labelStr : ''}} ${metric.count}`,
+          );
           lines.push(`${metric.name}_sum${labelStr ? '{' + labelStr + '}' : ''} ${metric.sum}`);
           lines.push(`${metric.name}_count${labelStr ? '{' + labelStr + '}' : ''} ${metric.count}`);
           break;
 
         case MetricType.SUMMARY:
           for (const [quantile, value] of metric.quantiles.entries()) {
-            lines.push(`${metric.name}{quantile="${quantile}"${labelStr ? ',' + labelStr : ''}} ${value}`);
+            lines.push(
+              `${metric.name}{quantile="${quantile}"${labelStr ? ',' + labelStr : ''}} ${value}`,
+            );
           }
           lines.push(`${metric.name}_sum${labelStr ? '{' + labelStr + '}' : ''} ${metric.sum}`);
           lines.push(`${metric.name}_count${labelStr ? '{' + labelStr + '}' : ''} ${metric.count}`);
@@ -430,7 +438,7 @@ export class MetricsCollector extends EventEmitter {
     this.collectionInterval = setInterval(() => {
       const metrics = this.getMetrics();
       this.emit('collect', metrics);
-      
+
       // Log sample metrics
       logger.debug('Metrics collected', {
         counters: this.counters.size,
@@ -514,10 +522,15 @@ export class MetricsCollector extends EventEmitter {
 export const metrics = new MetricsCollector();
 
 // Convenience functions
-export function recordApiCall(method: string, endpoint: string, status: number, duration: number): void {
+export function recordApiCall(
+  method: string,
+  endpoint: string,
+  status: number,
+  duration: number,
+): void {
   metrics.increment('api_calls_total', 1, { method, endpoint, status });
   metrics.observe('api_call_duration_ms', duration, { method, endpoint });
-  
+
   if (status >= 400) {
     metrics.increment('api_errors_total', 1, { method, endpoint, status });
   }
@@ -532,4 +545,4 @@ export function recordRateLimitMetrics(accepted: boolean, operation: string): vo
 }
 
 // Export types
-export type { MetricAggregation }; 
+export type { MetricAggregation };

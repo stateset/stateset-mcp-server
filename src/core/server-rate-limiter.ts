@@ -37,7 +37,11 @@ export class RateLimiter {
     });
   }
 
-  private async executeWithRetry<T>(fn: () => Promise<T>, operation: string, retries: number): Promise<T> {
+  private async executeWithRetry<T>(
+    fn: () => Promise<T>,
+    operation: string,
+    retries: number,
+  ): Promise<T> {
     for (let attempt = 1; ; attempt++) {
       try {
         return await fn();
@@ -47,15 +51,18 @@ export class RateLimiter {
         }
         const delay = Math.pow(2, attempt - 1) * 1000;
         logger.warn('Retrying API request', { operation, attempt, delay });
-        await new Promise(res => setTimeout(res, delay));
+        await new Promise((res) => setTimeout(res, delay));
       }
     }
   }
 
   private isRetryableError(error: any): boolean {
     if (axios.isAxiosError(error)) {
-      return !error.response || error.code === 'ECONNABORTED' ||
-             (error.response.status >= 500 && error.response.status < 600);
+      return (
+        !error.response ||
+        error.code === 'ECONNABORTED' ||
+        (error.response.status >= 500 && error.response.status < 600)
+      );
     }
     return false;
   }
@@ -66,11 +73,11 @@ export class RateLimiter {
 
     while (this.queue.length > 0) {
       const now = Date.now();
-      const requestsInLastHour = this.requestTimestamps.filter(t => t > now - 3600000).length;
-      
+      const requestsInLastHour = this.requestTimestamps.filter((t) => t > now - 3600000).length;
+
       if (requestsInLastHour >= this.requestsPerHour * 0.9) {
         const waitTime = this.minDelayMs - (now - this.lastRequestTime);
-        if (waitTime > 0) await new Promise(resolve => setTimeout(resolve, waitTime));
+        if (waitTime > 0) await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
 
       const fn = this.queue.shift();
@@ -86,19 +93,20 @@ export class RateLimiter {
     this.requestTimes.push(duration);
     this.requestTimestamps.push(startTime);
     const oneHourAgo = Date.now() - 3600000;
-    this.requestTimestamps = this.requestTimestamps.filter(t => t > oneHourAgo);
+    this.requestTimestamps = this.requestTimestamps.filter((t) => t > oneHourAgo);
     this.requestTimes = this.requestTimes.slice(-this.requestTimestamps.length);
   }
 
   getMetrics(): RateLimiterMetrics {
     const now = Date.now();
-    const requestsInLastHour = this.requestTimestamps.filter(t => t > now - 3600000).length;
+    const requestsInLastHour = this.requestTimestamps.filter((t) => t > now - 3600000).length;
     return {
       totalRequests: this.requestTimestamps.length,
       requestsInLastHour,
-      averageRequestTime: this.requestTimes.length > 0
-        ? this.requestTimes.reduce((a, b) => a + b, 0) / this.requestTimes.length
-        : 0,
+      averageRequestTime:
+        this.requestTimes.length > 0
+          ? this.requestTimes.reduce((a, b) => a + b, 0) / this.requestTimes.length
+          : 0,
       queueLength: this.queue.length,
       lastRequestTime: new Date(this.lastRequestTime).toISOString(),
     };
@@ -124,26 +132,32 @@ export interface ToolRateLimitMetrics {
 // Per-Tool Rate Limiter with Token Bucket Algorithm
 export class ToolRateLimiter {
   private readonly limits: Record<ToolCategory, ToolRateLimitConfig> = {
-    read: { requestsPerMinute: 120, burstSize: 20 },      // High throughput for reads
-    create: { requestsPerMinute: 30, burstSize: 5 },      // Moderate for creates
-    update: { requestsPerMinute: 60, burstSize: 10 },     // Medium for updates
-    delete: { requestsPerMinute: 20, burstSize: 3 },      // Conservative for deletes
-    batch: { requestsPerMinute: 10, burstSize: 2 },       // Very limited for batch operations
-    admin: { requestsPerMinute: 30, burstSize: 5 },       // Moderate for admin/metrics
+    read: { requestsPerMinute: 120, burstSize: 20 }, // High throughput for reads
+    create: { requestsPerMinute: 30, burstSize: 5 }, // Moderate for creates
+    update: { requestsPerMinute: 60, burstSize: 10 }, // Medium for updates
+    delete: { requestsPerMinute: 20, burstSize: 3 }, // Conservative for deletes
+    batch: { requestsPerMinute: 10, burstSize: 2 }, // Very limited for batch operations
+    admin: { requestsPerMinute: 30, burstSize: 5 }, // Moderate for admin/metrics
   };
 
-  private readonly buckets: Map<ToolCategory, {
-    tokens: number;
-    lastRefill: number;
-    requestTimestamps: number[];
-  }> = new Map();
+  private readonly buckets: Map<
+    ToolCategory,
+    {
+      tokens: number;
+      lastRefill: number;
+      requestTimestamps: number[];
+    }
+  > = new Map();
 
   constructor(customLimits?: Partial<Record<ToolCategory, ToolRateLimitConfig>>) {
     // Apply custom limits if provided
     if (customLimits) {
       for (const [category, config] of Object.entries(customLimits)) {
         if (this.limits[category as ToolCategory]) {
-          this.limits[category as ToolCategory] = { ...this.limits[category as ToolCategory], ...config };
+          this.limits[category as ToolCategory] = {
+            ...this.limits[category as ToolCategory],
+            ...config,
+          };
         }
       }
     }
@@ -196,11 +210,13 @@ export class ToolRateLimiter {
 
     // Clean up old timestamps (older than 1 minute)
     const oneMinuteAgo = now - 60000;
-    bucket.requestTimestamps = bucket.requestTimestamps.filter(t => t > oneMinuteAgo);
+    bucket.requestTimestamps = bucket.requestTimestamps.filter((t) => t > oneMinuteAgo);
   }
 
   // Check if a tool can be executed (acquire token)
-  async acquire(toolName: string): Promise<{ allowed: boolean; waitTimeMs: number; category: ToolCategory }> {
+  async acquire(
+    toolName: string,
+  ): Promise<{ allowed: boolean; waitTimeMs: number; category: ToolCategory }> {
     const category = this.categorize(toolName);
     this.refillTokens(category);
 
@@ -231,7 +247,7 @@ export class ToolRateLimiter {
         category: result.category,
         waitTimeMs: result.waitTimeMs,
       });
-      await new Promise(resolve => setTimeout(resolve, result.waitTimeMs));
+      await new Promise((resolve) => setTimeout(resolve, result.waitTimeMs));
       result = await this.acquire(toolName);
     }
 
@@ -239,7 +255,9 @@ export class ToolRateLimiter {
   }
 
   // Get metrics for a specific category or all categories
-  getMetrics(category?: ToolCategory): ToolRateLimitMetrics | Record<ToolCategory, ToolRateLimitMetrics> {
+  getMetrics(
+    category?: ToolCategory,
+  ): ToolRateLimitMetrics | Record<ToolCategory, ToolRateLimitMetrics> {
     if (category) {
       this.refillTokens(category);
       const bucket = this.buckets.get(category)!;
@@ -249,9 +267,8 @@ export class ToolRateLimiter {
         requestsInLastMinute: bucket.requestTimestamps.length,
         tokensRemaining: Math.floor(bucket.tokens),
         isThrottled: bucket.tokens < 1,
-        lastRequestTime: lastTimestamp !== undefined
-          ? new Date(lastTimestamp).toISOString()
-          : 'never',
+        lastRequestTime:
+          lastTimestamp !== undefined ? new Date(lastTimestamp).toISOString() : 'never',
       };
     }
 

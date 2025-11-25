@@ -44,7 +44,7 @@ export class IntelligentCache<T> extends EventEmitter {
 
   constructor(config: Partial<CacheConfig> = {}) {
     super();
-    
+
     this.config = {
       maxSize: 1000,
       defaultTTL: 300000, // 5 minutes
@@ -67,7 +67,7 @@ export class IntelligentCache<T> extends EventEmitter {
 
     // Start cleanup interval
     this.cleanupInterval = setInterval(() => this.cleanup(), 60000); // Every minute
-    
+
     logger.info('Intelligent cache initialized', { config: this.config });
   }
 
@@ -95,7 +95,7 @@ export class IntelligentCache<T> extends EventEmitter {
     entry.hits++;
     entry.lastAccessed = Date.now();
     entry.priority = this.calculatePriority(entry);
-    
+
     this.stats.hits++;
     this.recordAccess(key, true);
     this.updateStats();
@@ -104,34 +104,33 @@ export class IntelligentCache<T> extends EventEmitter {
     this.updateAverageResponseTime(responseTime);
 
     logger.debug('Cache hit', { key, hits: entry.hits, responseTime });
-    
+
     return entry.value;
   }
 
   async set(
-    key: string, 
-    value: T, 
+    key: string,
+    value: T,
     options: {
       ttl?: number;
       tags?: string[];
       priority?: number;
-    } = {}
+    } = {},
   ): Promise<void> {
     const ttl = options.ttl || this.config.defaultTTL;
     const tags = new Set(options.tags || []);
     const priority = options.priority || this.calculateInitialPriority(key);
-    
+
     const size = this.calculateSize(value);
-    
+
     // Check memory limits
     if (this.currentSize + size > this.config.maxMemoryMB * 1024 * 1024) {
       await this.makeSpace(size);
     }
 
     // Compress large values
-    const processedValue = size > this.config.compressionThreshold 
-      ? await this.compress(value) 
-      : value;
+    const processedValue =
+      size > this.config.compressionThreshold ? await this.compress(value) : value;
 
     const entry: CacheEntry<T> = {
       value: processedValue,
@@ -151,9 +150,9 @@ export class IntelligentCache<T> extends EventEmitter {
 
     this.cache.set(key, entry);
     this.currentSize += size;
-    
+
     // Update tag index
-    tags.forEach(tag => {
+    tags.forEach((tag) => {
       if (!this.tagIndex.has(tag)) {
         this.tagIndex.set(tag, new Set());
       }
@@ -161,14 +160,14 @@ export class IntelligentCache<T> extends EventEmitter {
     });
 
     this.updateStats();
-    
+
     // Predictive caching
     if (this.config.enablePredictive) {
       this.updatePredictionModel(key);
     }
 
     logger.debug('Cache set', { key, size, ttl, tags: Array.from(tags) });
-    
+
     this.emit('set', { key, value, size });
   }
 
@@ -180,7 +179,7 @@ export class IntelligentCache<T> extends EventEmitter {
     this.currentSize -= entry.size;
 
     // Update tag index
-    entry.tags.forEach(tag => {
+    entry.tags.forEach((tag) => {
       const tagSet = this.tagIndex.get(tag);
       if (tagSet) {
         tagSet.delete(key);
@@ -192,18 +191,18 @@ export class IntelligentCache<T> extends EventEmitter {
 
     this.updateStats();
     this.emit('delete', { key });
-    
+
     return true;
   }
 
   // Delete by tags
   deleteByTags(tags: string[]): number {
     let deletedCount = 0;
-    
-    tags.forEach(tag => {
+
+    tags.forEach((tag) => {
       const keys = this.tagIndex.get(tag);
       if (keys) {
-        keys.forEach(key => {
+        keys.forEach((key) => {
           if (this.delete(key)) {
             deletedCount++;
           }
@@ -220,14 +219,14 @@ export class IntelligentCache<T> extends EventEmitter {
     if (!this.config.enablePredictive) return;
 
     const predictions = this.getPredictions(keyPattern);
-    
+
     for (const predictedKey of predictions) {
       if (!this.cache.has(predictedKey)) {
         try {
           const value = await fetcher(predictedKey);
-          await this.set(predictedKey, value, { 
+          await this.set(predictedKey, value, {
             ttl: this.config.defaultTTL * 0.5, // Shorter TTL for predicted items
-            priority: 0.5 // Lower priority
+            priority: 0.5, // Lower priority
           });
           logger.debug('Predictive cache prefetch', { key: predictedKey });
         } catch (error) {
@@ -240,27 +239,29 @@ export class IntelligentCache<T> extends EventEmitter {
   // Batch operations
   async mget(keys: string[]): Promise<Map<string, T>> {
     const result = new Map<string, T>();
-    
-    await Promise.all(keys.map(async key => {
-      const value = await this.get(key);
-      if (value !== undefined) {
-        result.set(key, value);
-      }
-    }));
+
+    await Promise.all(
+      keys.map(async (key) => {
+        const value = await this.get(key);
+        if (value !== undefined) {
+          result.set(key, value);
+        }
+      }),
+    );
 
     return result;
   }
 
   async mset(entries: Array<{ key: string; value: T; options?: any }>): Promise<void> {
-    await Promise.all(entries.map(({ key, value, options }) => 
-      this.set(key, value, options)
-    ));
+    await Promise.all(entries.map(({ key, value, options }) => this.set(key, value, options)));
   }
 
   // Cache warming
-  async warm(entries: Array<{ key: string; fetcher: () => Promise<T>; options?: any }>): Promise<void> {
+  async warm(
+    entries: Array<{ key: string; fetcher: () => Promise<T>; options?: any }>,
+  ): Promise<void> {
     logger.info('Starting cache warming', { entryCount: entries.length });
-    
+
     const results = await Promise.allSettled(
       entries.map(async ({ key, fetcher, options }) => {
         try {
@@ -271,17 +272,17 @@ export class IntelligentCache<T> extends EventEmitter {
           logger.warn('Cache warming failed for key', { key, error });
           return { key, success: false, error };
         }
-      })
+      }),
     );
 
-    const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+    const successful = results.filter((r) => r.status === 'fulfilled' && r.value.success).length;
     logger.info('Cache warming completed', { successful, total: entries.length });
   }
 
   // Advanced cleanup
   private async cleanup(): Promise<void> {
     const before = this.cache.size;
-    
+
     // Remove expired entries
     for (const [key, entry] of this.cache) {
       if (this.isExpired(entry)) {
@@ -303,7 +304,7 @@ export class IntelligentCache<T> extends EventEmitter {
   private async adaptiveEviction(): Promise<void> {
     const evictionCount = Math.floor(this.config.maxSize * 0.1); // Remove 10%
     const entries = Array.from(this.cache.entries());
-    
+
     // Sort by adaptive priority (considers recency, frequency, and prediction)
     entries.sort(([, a], [, b]) => {
       const scoreA = this.calculateEvictionScore(a);
@@ -327,14 +328,14 @@ export class IntelligentCache<T> extends EventEmitter {
   private calculateEvictionScore(entry: CacheEntry<T>): number {
     const now = Date.now();
     const timeSinceAccess = now - entry.lastAccessed;
-    
+
     // Factors: recency (40%), frequency (30%), size (20%), priority (10%)
     const recencyScore = Math.min(timeSinceAccess / (24 * 60 * 60 * 1000), 1); // Normalize to days
     const frequencyScore = 1 / (entry.hits + 1);
     const sizeScore = entry.size / (1024 * 1024); // Normalize to MB
     const priorityScore = 1 - entry.priority;
-    
-    return (recencyScore * 0.4) + (frequencyScore * 0.3) + (sizeScore * 0.2) + (priorityScore * 0.1);
+
+    return recencyScore * 0.4 + frequencyScore * 0.3 + sizeScore * 0.2 + priorityScore * 0.1;
   }
 
   private calculatePriority(entry: CacheEntry<T>): number {
@@ -342,8 +343,8 @@ export class IntelligentCache<T> extends EventEmitter {
     const age = now - entry.timestamp;
     const recency = 1 - Math.min(age / (24 * 60 * 60 * 1000), 1); // Last 24 hours
     const frequency = Math.min(entry.hits / 100, 1); // Cap at 100 hits
-    
-    return (recency * 0.6) + (frequency * 0.4);
+
+    return recency * 0.6 + frequency * 0.4;
   }
 
   private calculateInitialPriority(key: string): number {
@@ -357,10 +358,10 @@ export class IntelligentCache<T> extends EventEmitter {
     if (!this.accessPattern.has(key)) {
       this.accessPattern.set(key, []);
     }
-    
+
     const pattern = this.accessPattern.get(key)!;
     pattern.push(Date.now());
-    
+
     // Keep only last 100 accesses
     if (pattern.length > 100) {
       pattern.splice(0, pattern.length - 100);
@@ -377,7 +378,7 @@ export class IntelligentCache<T> extends EventEmitter {
     for (let i = 1; i < history.length; i++) {
       intervals.push(history[i] - history[i - 1]);
     }
-    
+
     const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
     this.predictionModel.set(key, avgInterval);
   }
@@ -385,19 +386,19 @@ export class IntelligentCache<T> extends EventEmitter {
   private getPredictions(keyPattern: string): string[] {
     const predictions: string[] = [];
     const now = Date.now();
-    
+
     for (const [key, avgInterval] of this.predictionModel) {
       if (key.includes(keyPattern)) {
         const lastAccess = this.accessPattern.get(key)?.slice(-1)[0] || 0;
         const timeSinceAccess = now - lastAccess;
-        
+
         // Predict if access is likely soon
         if (timeSinceAccess > avgInterval * 0.8) {
           predictions.push(key);
         }
       }
     }
-    
+
     return predictions.slice(0, 10); // Limit predictions
   }
 
@@ -419,7 +420,10 @@ export class IntelligentCache<T> extends EventEmitter {
   }
 
   private async makeSpace(requiredSize: number): Promise<void> {
-    while (this.currentSize + requiredSize > this.config.maxMemoryMB * 1024 * 1024 && this.cache.size > 0) {
+    while (
+      this.currentSize + requiredSize > this.config.maxMemoryMB * 1024 * 1024 &&
+      this.cache.size > 0
+    ) {
       await this.adaptiveEviction();
     }
   }
@@ -432,7 +436,7 @@ export class IntelligentCache<T> extends EventEmitter {
 
   private updateAverageResponseTime(responseTime: number): void {
     const alpha = 0.1; // Smoothing factor
-    this.stats.averageResponseTime = 
+    this.stats.averageResponseTime =
       this.stats.averageResponseTime * (1 - alpha) + responseTime * alpha;
   }
 
@@ -455,7 +459,7 @@ export class IntelligentCache<T> extends EventEmitter {
       hitRate: 0,
       averageResponseTime: 0,
     };
-    
+
     this.emit('clear');
     logger.info('Cache cleared');
   }

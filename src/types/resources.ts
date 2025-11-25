@@ -50,4 +50,4 @@ export interface ResourceCacheEntry {
   data: unknown;
   timestamp: Date;
   ttl: number;
-} 
+}

@@ -1,5 +1,12 @@
 // Operation Timeout Configuration
-export type OperationType = 'read' | 'create' | 'update' | 'delete' | 'batch' | 'search' | 'default';
+export type OperationType =
+  | 'read'
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'batch'
+  | 'search'
+  | 'default';
 
 export interface OperationTimeoutConfig {
   timeouts: Record<OperationType, number>;
@@ -8,12 +15,12 @@ export interface OperationTimeoutConfig {
 
 export function createOperationTimeoutConfig(defaultTimeoutMs: number): OperationTimeoutConfig {
   const timeouts: Record<OperationType, number> = {
-    read: defaultTimeoutMs,                    // Standard read operations
-    create: defaultTimeoutMs * 1.5,            // Create operations may take longer
-    update: defaultTimeoutMs * 1.5,            // Update operations may take longer
-    delete: defaultTimeoutMs,                  // Delete operations are usually quick
-    batch: defaultTimeoutMs * 5,               // Batch operations need much more time
-    search: defaultTimeoutMs * 2,              // Search operations may involve complex queries
+    read: defaultTimeoutMs, // Standard read operations
+    create: defaultTimeoutMs * 1.5, // Create operations may take longer
+    update: defaultTimeoutMs * 1.5, // Update operations may take longer
+    delete: defaultTimeoutMs, // Delete operations are usually quick
+    batch: defaultTimeoutMs * 5, // Batch operations need much more time
+    search: defaultTimeoutMs * 2, // Search operations may involve complex queries
     default: defaultTimeoutMs,
   };
 

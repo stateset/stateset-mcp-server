@@ -14,7 +14,7 @@ const ConfigSchema = z.object({
     version: z.string().default('v1'),
     timeout: z.number().positive().default(10000),
   }),
-  
+
   // Rate Limiting Configuration
   rateLimit: z.object({
     requestsPerHour: z.number().positive().default(1000),
@@ -23,7 +23,7 @@ const ConfigSchema = z.object({
     retryAttempts: z.number().min(0).max(5).default(3),
     retryDelay: z.number().positive().default(1000),
   }),
-  
+
   // Server Configuration
   server: z.object({
     name: z.string().default('stateset-mcp-server'),
@@ -31,7 +31,7 @@ const ConfigSchema = z.object({
     environment: z.enum(['development', 'staging', 'production', 'test']).default('production'),
     logLevel: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   }),
-  
+
   // Feature Flags
   features: z.object({
     caching: z.boolean().default(true),
@@ -45,7 +45,7 @@ const ConfigSchema = z.object({
     enableTelemetry: z.boolean().default(false),
     websocket: z.boolean().default(true),
   }),
-  
+
   // Cache Configuration
   cache: z.object({
     enabled: z.boolean().default(true),
@@ -53,7 +53,7 @@ const ConfigSchema = z.object({
     maxSize: z.number().positive().default(1000),
     strategy: z.enum(['lru', 'lfu', 'fifo']).default('lru'),
   }),
-  
+
   // Circuit Breaker Configuration
   circuitBreaker: z.object({
     enabled: z.boolean().default(true),
@@ -61,7 +61,7 @@ const ConfigSchema = z.object({
     timeout: z.number().positive().default(60000), // 1 minute
     resetTimeout: z.number().positive().default(30000), // 30 seconds
   }),
-  
+
   // Monitoring Configuration
   monitoring: z.object({
     enabled: z.boolean().default(true),
@@ -82,10 +82,16 @@ function loadConfig(): Config {
       timeout: process.env.API_TIMEOUT_MS ? parseInt(process.env.API_TIMEOUT_MS, 10) : undefined,
     },
     rateLimit: {
-      requestsPerHour: process.env.REQUESTS_PER_HOUR ? parseInt(process.env.REQUESTS_PER_HOUR, 10) : undefined,
-      requestsPerMinute: process.env.REQUESTS_PER_MINUTE ? parseInt(process.env.REQUESTS_PER_MINUTE, 10) : undefined,
+      requestsPerHour: process.env.REQUESTS_PER_HOUR
+        ? parseInt(process.env.REQUESTS_PER_HOUR, 10)
+        : undefined,
+      requestsPerMinute: process.env.REQUESTS_PER_MINUTE
+        ? parseInt(process.env.REQUESTS_PER_MINUTE, 10)
+        : undefined,
       burstSize: process.env.BURST_SIZE ? parseInt(process.env.BURST_SIZE, 10) : undefined,
-      retryAttempts: process.env.RETRY_ATTEMPTS ? parseInt(process.env.RETRY_ATTEMPTS, 10) : undefined,
+      retryAttempts: process.env.RETRY_ATTEMPTS
+        ? parseInt(process.env.RETRY_ATTEMPTS, 10)
+        : undefined,
       retryDelay: process.env.RETRY_DELAY ? parseInt(process.env.RETRY_DELAY, 10) : undefined,
     },
     server: {
@@ -114,24 +120,36 @@ function loadConfig(): Config {
     },
     circuitBreaker: {
       enabled: process.env.CIRCUIT_BREAKER_ENABLED !== 'false',
-      threshold: process.env.CIRCUIT_BREAKER_THRESHOLD ? parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD, 10) : undefined,
-      timeout: process.env.CIRCUIT_BREAKER_TIMEOUT ? parseInt(process.env.CIRCUIT_BREAKER_TIMEOUT, 10) : undefined,
-      resetTimeout: process.env.CIRCUIT_BREAKER_RESET_TIMEOUT ? parseInt(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT, 10) : undefined,
+      threshold: process.env.CIRCUIT_BREAKER_THRESHOLD
+        ? parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD, 10)
+        : undefined,
+      timeout: process.env.CIRCUIT_BREAKER_TIMEOUT
+        ? parseInt(process.env.CIRCUIT_BREAKER_TIMEOUT, 10)
+        : undefined,
+      resetTimeout: process.env.CIRCUIT_BREAKER_RESET_TIMEOUT
+        ? parseInt(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT, 10)
+        : undefined,
     },
     monitoring: {
       enabled: process.env.MONITORING_ENABLED !== 'false',
-      metricsInterval: process.env.METRICS_INTERVAL ? parseInt(process.env.METRICS_INTERVAL, 10) : undefined,
-      healthCheckInterval: process.env.HEALTH_CHECK_INTERVAL ? parseInt(process.env.HEALTH_CHECK_INTERVAL, 10) : undefined,
+      metricsInterval: process.env.METRICS_INTERVAL
+        ? parseInt(process.env.METRICS_INTERVAL, 10)
+        : undefined,
+      healthCheckInterval: process.env.HEALTH_CHECK_INTERVAL
+        ? parseInt(process.env.HEALTH_CHECK_INTERVAL, 10)
+        : undefined,
     },
   };
-  
+
   try {
     return ConfigSchema.parse(rawConfig);
   } catch (error) {
     if (error instanceof z.ZodError) {
       const logger = pino({ level: 'error' });
       logger.error({ errors: error.errors }, 'Configuration validation failed');
-      throw new Error(`Configuration validation failed: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
+      throw new Error(
+        `Configuration validation failed: ${error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+      );
     }
     throw error;
   }
@@ -154,4 +172,4 @@ export function isFeatureEnabled(feature: keyof Config['features']): boolean {
 }
 
 // Export for testing
-export { ConfigSchema, loadConfig }; 
+export { ConfigSchema, loadConfig };

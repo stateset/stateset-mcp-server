@@ -50,18 +50,18 @@ export class AdvancedMetrics extends EventEmitter {
   private alerts = new Map<string, AlertRule>();
   private alertStates = new Map<string, { triggered: boolean; since: number }>();
   private performanceProfiles = new Map<string, PerformanceProfile>();
-  
+
   private collectionInterval: NodeJS.Timeout | null = null;
   private alertCheckInterval: NodeJS.Timeout | null = null;
   private systemMetricsInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     super();
-    
+
     this.startCollection();
     this.startAlertChecking();
     this.startSystemMetrics();
-    
+
     logger.info('Advanced metrics system initialized');
   }
 
@@ -105,7 +105,7 @@ export class AdvancedMetrics extends EventEmitter {
   recordHistogram(name: string, value: number, labels?: Record<string, string>): void {
     const key = this.getMetricKey(name, labels);
     let histogram = this.histograms.get(key);
-    
+
     if (!histogram) {
       histogram = {
         buckets: new Map(),
@@ -117,7 +117,7 @@ export class AdvancedMetrics extends EventEmitter {
 
     // Define standard buckets
     const buckets = [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, Infinity];
-    
+
     histogram.count++;
     histogram.sum += value;
 
@@ -141,10 +141,10 @@ export class AdvancedMetrics extends EventEmitter {
   profile<T>(functionName: string, fn: () => Promise<T>): Promise<T>;
   profile<T>(functionName: string, fn: () => T | Promise<T>): T | Promise<T> {
     const start = performance.now();
-    
+
     const updateProfile = (duration: number) => {
       let profile = this.performanceProfiles.get(functionName);
-      
+
       if (!profile) {
         profile = {
           function: functionName,
@@ -171,7 +171,7 @@ export class AdvancedMetrics extends EventEmitter {
 
     try {
       const result = fn();
-      
+
       if (result instanceof Promise) {
         return result
           .then((value) => {
@@ -201,7 +201,7 @@ export class AdvancedMetrics extends EventEmitter {
   // Timing utilities
   startTimer(name: string, labels?: Record<string, string>): () => void {
     const start = performance.now();
-    
+
     return () => {
       const duration = performance.now() - start;
       this.recordHistogram(name, duration / 1000, labels); // Convert to seconds
@@ -211,11 +211,11 @@ export class AdvancedMetrics extends EventEmitter {
   // Time series queries
   getTimeSeries(name: string, since?: number): MetricPoint[] {
     const series = this.timeSeries.get(name) || [];
-    
+
     if (since) {
-      return series.filter(point => point.timestamp >= since);
+      return series.filter((point) => point.timestamp >= since);
     }
-    
+
     return [...series];
   }
 
@@ -224,9 +224,9 @@ export class AdvancedMetrics extends EventEmitter {
     const now = Date.now();
     const since = now - windowMs;
     const points = this.getTimeSeries(name, since);
-    
+
     if (points.length === 0) return 0;
-    
+
     const sum = points.reduce((acc, point) => acc + point.value, 0);
     return sum / points.length;
   }
@@ -235,25 +235,25 @@ export class AdvancedMetrics extends EventEmitter {
     const now = Date.now();
     const since = now - windowMs;
     const points = this.getTimeSeries(name, since);
-    
+
     if (points.length === 0) return 0;
-    
-    return Math.max(...points.map(p => p.value));
+
+    return Math.max(...points.map((p) => p.value));
   }
 
   getPercentile(name: string, percentile: number, windowMs?: number): number {
     let points = this.getTimeSeries(name);
-    
+
     if (windowMs) {
       const since = Date.now() - windowMs;
-      points = points.filter(p => p.timestamp >= since);
+      points = points.filter((p) => p.timestamp >= since);
     }
-    
+
     if (points.length === 0) return 0;
-    
-    const values = points.map(p => p.value).sort((a, b) => a - b);
+
+    const values = points.map((p) => p.value).sort((a, b) => a - b);
     const index = Math.ceil((percentile / 100) * values.length) - 1;
-    
+
     return values[Math.max(0, index)] ?? 0;
   }
 
@@ -280,30 +280,30 @@ export class AdvancedMetrics extends EventEmitter {
   private collectSystemMetrics(): void {
     const memUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
-    
+
     // Memory metrics
     this.setGauge('process_memory_rss_bytes', memUsage.rss);
     this.setGauge('process_memory_heap_used_bytes', memUsage.heapUsed);
     this.setGauge('process_memory_heap_total_bytes', memUsage.heapTotal);
     this.setGauge('process_memory_external_bytes', memUsage.external);
-    
+
     // CPU metrics
     this.setGauge('process_cpu_user_seconds_total', cpuUsage.user / 1000000);
     this.setGauge('process_cpu_system_seconds_total', cpuUsage.system / 1000000);
-    
+
     // Event loop lag
     const start = performance.now();
     setImmediate(() => {
       const lag = performance.now() - start;
       this.recordHistogram('event_loop_lag_seconds', lag / 1000);
     });
-    
+
     // GC metrics if available
     if (global.gc) {
       const beforeGC = process.memoryUsage();
       global.gc();
       const afterGC = process.memoryUsage();
-      
+
       this.incrementCounter('gc_runs_total');
       this.setGauge('gc_memory_freed_bytes', beforeGC.heapUsed - afterGC.heapUsed);
     }
@@ -324,16 +324,16 @@ export class AdvancedMetrics extends EventEmitter {
   private checkAlerts(): void {
     for (const [id, rule] of this.alerts) {
       if (!rule.enabled) continue;
-      
+
       const snapshot = this.getMetricSnapshot(rule.metric);
       if (!snapshot) continue;
-      
+
       const value = typeof snapshot.value === 'number' ? snapshot.value : 0;
       const shouldTrigger = this.evaluateCondition(value, rule.condition, rule.threshold);
-      
+
       const state = this.alertStates.get(id)!;
       const now = Date.now();
-      
+
       if (shouldTrigger && !state.triggered) {
         state.triggered = true;
         state.since = now;
@@ -341,9 +341,9 @@ export class AdvancedMetrics extends EventEmitter {
         state.triggered = false;
         state.since = 0;
       }
-      
+
       // Check if alert should fire
-      if (state.triggered && (now - state.since) >= rule.duration) {
+      if (state.triggered && now - state.since >= rule.duration) {
         this.fireAlert(rule, snapshot);
       }
     }
@@ -351,23 +351,27 @@ export class AdvancedMetrics extends EventEmitter {
 
   private evaluateCondition(value: number, condition: string, threshold: number): boolean {
     switch (condition) {
-      case 'gt': return value > threshold;
-      case 'lt': return value < threshold;
-      case 'eq': return value === threshold;
-      default: return false;
+      case 'gt':
+        return value > threshold;
+      case 'lt':
+        return value < threshold;
+      case 'eq':
+        return value === threshold;
+      default:
+        return false;
     }
   }
 
   private fireAlert(rule: AlertRule, snapshot: MetricSnapshot): void {
-    logger.warn('Alert triggered', { 
-      id: rule.id, 
-      metric: rule.metric, 
+    logger.warn('Alert triggered', {
+      id: rule.id,
+      metric: rule.metric,
       value: snapshot.value,
-      threshold: rule.threshold 
+      threshold: rule.threshold,
     });
-    
+
     this.emit('alert', { rule, snapshot });
-    
+
     if (rule.callback) {
       try {
         rule.callback(snapshot);
@@ -387,7 +391,7 @@ export class AdvancedMetrics extends EventEmitter {
         timestamp: Date.now(),
       };
     }
-    
+
     if (this.gauges.has(name)) {
       return {
         name,
@@ -396,7 +400,7 @@ export class AdvancedMetrics extends EventEmitter {
         timestamp: Date.now(),
       };
     }
-    
+
     if (this.histograms.has(name)) {
       return {
         name,
@@ -405,16 +409,16 @@ export class AdvancedMetrics extends EventEmitter {
         timestamp: Date.now(),
       };
     }
-    
+
     return undefined;
   }
 
   private cleanupOldData(): void {
     const maxAge = 24 * 60 * 60 * 1000; // 24 hours
     const cutoff = Date.now() - maxAge;
-    
+
     for (const [name, points] of this.timeSeries) {
-      const filtered = points.filter(point => point.timestamp > cutoff);
+      const filtered = points.filter((point) => point.timestamp > cutoff);
       this.timeSeries.set(name, filtered);
     }
   }
@@ -423,14 +427,14 @@ export class AdvancedMetrics extends EventEmitter {
     if (!this.timeSeries.has(name)) {
       this.timeSeries.set(name, []);
     }
-    
+
     const series = this.timeSeries.get(name)!;
     series.push({
       value,
       timestamp: Date.now(),
       labels,
     });
-    
+
     // Keep only recent data (last 1000 points)
     if (series.length > 1000) {
       series.splice(0, series.length - 1000);
@@ -439,19 +443,19 @@ export class AdvancedMetrics extends EventEmitter {
 
   private getMetricKey(name: string, labels?: Record<string, string>): string {
     if (!labels) return name;
-    
+
     const labelString = Object.entries(labels)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, value]) => `${key}="${value}"`)
       .join(',');
-    
+
     return `${name}{${labelString}}`;
   }
 
   // Export methods
   getAllMetrics(): MetricSnapshot[] {
     const snapshots: MetricSnapshot[] = [];
-    
+
     // Counters
     for (const [key, value] of this.counters) {
       snapshots.push({
@@ -461,7 +465,7 @@ export class AdvancedMetrics extends EventEmitter {
         timestamp: Date.now(),
       });
     }
-    
+
     // Gauges
     for (const [key, value] of this.gauges) {
       snapshots.push({
@@ -471,7 +475,7 @@ export class AdvancedMetrics extends EventEmitter {
         timestamp: Date.now(),
       });
     }
-    
+
     // Histograms
     for (const [key, value] of this.histograms) {
       snapshots.push({
@@ -481,7 +485,7 @@ export class AdvancedMetrics extends EventEmitter {
         timestamp: Date.now(),
       });
     }
-    
+
     return snapshots;
   }
 
@@ -491,32 +495,32 @@ export class AdvancedMetrics extends EventEmitter {
 
   exportPrometheus(): string {
     const lines: string[] = [];
-    
+
     // Export counters
     for (const [key, value] of this.counters) {
       lines.push(`# TYPE ${key} counter`);
       lines.push(`${key} ${value}`);
     }
-    
+
     // Export gauges
     for (const [key, value] of this.gauges) {
       lines.push(`# TYPE ${key} gauge`);
       lines.push(`${key} ${value}`);
     }
-    
+
     // Export histograms
     for (const [key, histogram] of this.histograms) {
       lines.push(`# TYPE ${key} histogram`);
-      
+
       for (const [bucket, count] of histogram.buckets) {
         const bucketLabel = bucket === Infinity ? '+Inf' : bucket.toString();
         lines.push(`${key}_bucket{le="${bucketLabel}"} ${count}`);
       }
-      
+
       lines.push(`${key}_count ${histogram.count}`);
       lines.push(`${key}_sum ${histogram.sum}`);
     }
-    
+
     return lines.join('\n');
   }
 
@@ -526,7 +530,7 @@ export class AdvancedMetrics extends EventEmitter {
     this.histograms.clear();
     this.timeSeries.clear();
     this.performanceProfiles.clear();
-    
+
     logger.info('Metrics reset');
   }
 
@@ -534,7 +538,7 @@ export class AdvancedMetrics extends EventEmitter {
     if (this.collectionInterval) clearInterval(this.collectionInterval);
     if (this.alertCheckInterval) clearInterval(this.alertCheckInterval);
     if (this.systemMetricsInterval) clearInterval(this.systemMetricsInterval);
-    
+
     this.removeAllListeners();
     logger.info('Advanced metrics system destroyed');
   }

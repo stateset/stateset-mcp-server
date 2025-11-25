@@ -21,11 +21,11 @@ export function gracefulShutdown(server: MCPServer): void {
     try {
       // Give ongoing requests time to complete
       const shutdownTimeout = parseInt(process.env.SHUTDOWN_TIMEOUT_MS || '10000', 10);
-      
+
       await Promise.race([
         server.stop(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Shutdown timeout')), shutdownTimeout)
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Shutdown timeout')), shutdownTimeout),
         ),
       ]);
 
@@ -51,4 +51,4 @@ export function gracefulShutdown(server: MCPServer): void {
  */
 export function isServerShuttingDown(): boolean {
   return isShuttingDown;
-} 
+}

@@ -46,7 +46,7 @@ abstract class CacheStrategy<T> {
 
   get(key: string): T | undefined {
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       this.stats.misses++;
       this.updateHitRate();
@@ -67,11 +67,11 @@ abstract class CacheStrategy<T> {
     entry.lastAccessed = Date.now();
     entry.hits++;
     this.onAccess(key);
-    
+
     this.stats.hits++;
     this.updateHitRate();
     logger.logCacheHit(key);
-    
+
     return entry.value;
   }
 
@@ -260,7 +260,11 @@ export class CacheManager {
       const size = maxSize || config.cache.maxSize;
       const strategy = createCacheStrategy<T>(config.cache.strategy, size);
       this.caches.set(namespace, strategy);
-      logger.info('Created cache namespace', { namespace, strategy: config.cache.strategy, maxSize: size });
+      logger.info('Created cache namespace', {
+        namespace,
+        strategy: config.cache.strategy,
+        maxSize: size,
+      });
     }
     return this.caches.get(namespace)!;
   }
@@ -303,7 +307,7 @@ export class CacheManager {
         logger.info('Cleared cache namespace', { namespace });
       }
     } else {
-      for (const [ _ns, cache] of this.caches.entries()) {
+      for (const [_ns, cache] of this.caches.entries()) {
         cache.clear();
       }
       logger.info('Cleared all caches');
@@ -318,7 +322,7 @@ export class CacheManager {
 
   async warmup(namespace?: string): Promise<void> {
     const namespaces = namespace ? [namespace] : Array.from(this.warmupFunctions.keys());
-    
+
     for (const ns of namespaces) {
       const warmupFn = this.warmupFunctions.get(ns);
       if (warmupFn) {
@@ -338,14 +342,16 @@ export class CacheManager {
   getStats(namespace?: string): Record<string, CacheStats> | CacheStats {
     if (namespace) {
       const cache = this.caches.get(namespace);
-      return cache ? cache.getStats() : {
-        hits: 0,
-        misses: 0,
-        evictions: 0,
-        size: 0,
-        itemCount: 0,
-        hitRate: 0,
-      };
+      return cache
+        ? cache.getStats()
+        : {
+            hits: 0,
+            misses: 0,
+            evictions: 0,
+            size: 0,
+            itemCount: 0,
+            hitRate: 0,
+          };
     }
 
     const stats: Record<string, CacheStats> = {};
@@ -386,7 +392,7 @@ export function Cacheable(namespace: string, _ttl?: number) {
 
     descriptor.value = async function (...args: any[]) {
       const key = `${propertyName}:${JSON.stringify(args)}`;
-      
+
       return cacheManager.get(namespace, key, async () => {
         return originalMethod.apply(this, args);
       });
@@ -397,4 +403,4 @@ export function Cacheable(namespace: string, _ttl?: number) {
 }
 
 // Export types
-export type { CacheStats, CacheEntry }; 
+export type { CacheStats, CacheEntry };

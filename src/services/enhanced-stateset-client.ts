@@ -38,7 +38,7 @@ export class EnhancedRateLimiter {
   async enqueue<T>(fn: () => Promise<T>, operation: string, retries = 3): Promise<T> {
     const startTime = Date.now();
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     return new Promise((resolve, reject) => {
       this.queue.push(async () => {
         try {
@@ -59,10 +59,10 @@ export class EnhancedRateLimiter {
   }
 
   private async executeWithRetry<T>(
-    fn: () => Promise<T>, 
-    operation: string, 
+    fn: () => Promise<T>,
+    operation: string,
     retries: number,
-    requestId: string
+    requestId: string,
   ): Promise<T> {
     for (let attempt = 1; ; attempt++) {
       try {
@@ -73,17 +73,19 @@ export class EnhancedRateLimiter {
         }
         const delay = Math.min(Math.pow(2, attempt - 1) * 1000, 30000); // Max 30s delay
         logger.warn({ operation, attempt, delay, requestId }, 'Retrying API request');
-        await new Promise(res => setTimeout(res, delay));
+        await new Promise((res) => setTimeout(res, delay));
       }
     }
   }
 
   private isRetryableError(error: unknown): boolean {
     if (error instanceof AxiosError) {
-      return !error.response || 
-             error.code === 'ECONNABORTED' ||
-             (error.response.status >= 500 && error.response.status < 600) ||
-             error.response.status === 429; // Rate limited
+      return (
+        !error.response ||
+        error.code === 'ECONNABORTED' ||
+        (error.response.status >= 500 && error.response.status < 600) ||
+        error.response.status === 429
+      ); // Rate limited
     }
     return false;
   }
@@ -94,12 +96,12 @@ export class EnhancedRateLimiter {
 
     while (this.queue.length > 0) {
       const now = Date.now();
-      const requestsInLastHour = this.requestTimestamps.filter(t => t > now - 3600000).length;
-      
+      const requestsInLastHour = this.requestTimestamps.filter((t) => t > now - 3600000).length;
+
       if (requestsInLastHour >= this.requestsPerHour * 0.9) {
         const waitTime = this.minDelayMs - (now - this.lastRequestTime);
         if (waitTime > 0) {
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
         }
       }
 
@@ -116,19 +118,20 @@ export class EnhancedRateLimiter {
     this.requestTimes.push(duration);
     this.requestTimestamps.push(startTime);
     const oneHourAgo = Date.now() - 3600000;
-    this.requestTimestamps = this.requestTimestamps.filter(t => t > oneHourAgo);
+    this.requestTimestamps = this.requestTimestamps.filter((t) => t > oneHourAgo);
     this.requestTimes = this.requestTimes.slice(-this.requestTimestamps.length);
   }
 
   getMetrics(): RequestMetrics {
     const now = Date.now();
-    const requestsInLastHour = this.requestTimestamps.filter(t => t > now - 3600000).length;
+    const requestsInLastHour = this.requestTimestamps.filter((t) => t > now - 3600000).length;
     return {
       totalRequests: this.requestTimestamps.length,
       requestsInLastHour,
-      averageRequestTime: this.requestTimes.length > 0
-        ? this.requestTimes.reduce((a, b) => a + b, 0) / this.requestTimes.length
-        : 0,
+      averageRequestTime:
+        this.requestTimes.length > 0
+          ? this.requestTimes.reduce((a, b) => a + b, 0) / this.requestTimes.length
+          : 0,
       queueLength: this.queue.length,
       lastRequestTime: new Date(this.lastRequestTime).toISOString(),
     };
@@ -144,14 +147,14 @@ export class EnhancedStateSetClient {
     if (!config.api.key) {
       throw new APIError('API key is required', 401, 'MISSING_API_KEY');
     }
-    
+
     this.baseUrl = config.api.baseUrl;
     this.rateLimiter = new EnhancedRateLimiter(config.rateLimit.requestsPerHour);
-    
+
     this.apiClient = axios.create({
       baseURL: config.api.baseUrl,
       headers: {
-        'Authorization': `Bearer ${config.api.key}`,
+        Authorization: `Bearer ${config.api.key}`,
         'Content-Type': 'application/json',
         'User-Agent': `${config.server.name}/${config.server.version}`,
       },
@@ -169,16 +172,19 @@ export class EnhancedStateSetClient {
       (config) => {
         const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         config.metadata = { requestId, startTime: Date.now() };
-        
-        logger.debug({
-          method: config.method?.toUpperCase(),
-          url: config.url,
-          requestId,
-        }, 'Outgoing API request');
-        
+
+        logger.debug(
+          {
+            method: config.method?.toUpperCase(),
+            url: config.url,
+            requestId,
+          },
+          'Outgoing API request',
+        );
+
         return config;
       },
-      (error) => Promise.reject(handleError(error))
+      (error) => Promise.reject(handleError(error)),
     );
 
     // Response interceptor for logging and error handling
@@ -186,25 +192,31 @@ export class EnhancedStateSetClient {
       (response) => {
         const requestId = response.config.metadata?.requestId;
         const duration = Date.now() - (response.config.metadata?.startTime || 0);
-        
-        logger.debug({
-          status: response.status,
-          duration,
-          requestId,
-        }, 'API response received');
-        
+
+        logger.debug(
+          {
+            status: response.status,
+            duration,
+            requestId,
+          },
+          'API response received',
+        );
+
         return response;
       },
       (error: AxiosError) => {
         const requestId = error.config?.metadata?.requestId;
-        logger.error({
-          error: error.message,
-          status: error.response?.status,
-          requestId,
-        }, 'API request failed');
-        
+        logger.error(
+          {
+            error: error.message,
+            status: error.response?.status,
+            requestId,
+          },
+          'API request failed',
+        );
+
         return Promise.reject(handleError(error, { requestId }));
-      }
+      },
     );
   }
 
@@ -215,7 +227,10 @@ export class EnhancedStateSetClient {
     };
   }
 
-  private enrichListResponse<T>(data: T[]): { items: T[]; metadata: { apiMetrics: RequestMetrics } } {
+  private enrichListResponse<T>(data: T[]): {
+    items: T[];
+    metadata: { apiMetrics: RequestMetrics };
+  } {
     return {
       items: data,
       metadata: { apiMetrics: this.rateLimiter.getMetrics() },
@@ -226,17 +241,17 @@ export class EnhancedStateSetClient {
   async create<T>(endpoint: string, data: unknown): Promise<StateSetResponse> {
     const response = await this.rateLimiter.enqueue(
       () => this.apiClient.post(endpoint, data),
-      `create_${endpoint.replace('/', '')}`
+      `create_${endpoint.replace('/', '')}`,
     );
-    
+
     if (response.status >= 400) {
       throw new APIError(
         `Failed to create resource: ${response.statusText}`,
         response.status,
-        'CREATE_FAILED'
+        'CREATE_FAILED',
       );
     }
-    
+
     const result = response.data;
     return this.enrichResponse({
       id: result.id,
@@ -250,83 +265,82 @@ export class EnhancedStateSetClient {
 
   async update<T>(endpoint: string, id: string, data: unknown): Promise<StateSetResponse> {
     const sanitizedId = validateAndSanitizeInput(SanitizedIdSchema, id, 'resource ID');
-    
+
     const response = await this.rateLimiter.enqueue(
       () => this.apiClient.patch(`${endpoint}/${sanitizedId}`, data),
-      `update_${endpoint.replace('/', '')}`
+      `update_${endpoint.replace('/', '')}`,
     );
-    
+
     if (response.status >= 400) {
       throw new APIError(
         `Failed to update resource: ${response.statusText}`,
         response.status,
-        'UPDATE_FAILED'
+        'UPDATE_FAILED',
       );
     }
-    
+
     return this.enrichResponse(response.data);
   }
 
   async get(endpoint: string, id: string): Promise<StateSetResponse> {
     const sanitizedId = validateAndSanitizeInput(SanitizedIdSchema, id, 'resource ID');
-    
+
     const response = await this.rateLimiter.enqueue(
       () => this.apiClient.get(`${endpoint}/${sanitizedId}`),
-      `get_${endpoint.replace('/', '')}`
+      `get_${endpoint.replace('/', '')}`,
     );
-    
+
     if (response.status === 404) {
-      throw new APIError(
-        `Resource not found: ${sanitizedId}`,
-        404,
-        'RESOURCE_NOT_FOUND'
-      );
+      throw new APIError(`Resource not found: ${sanitizedId}`, 404, 'RESOURCE_NOT_FOUND');
     }
-    
+
     if (response.status >= 400) {
       throw new APIError(
         `Failed to get resource: ${response.statusText}`,
         response.status,
-        'GET_FAILED'
+        'GET_FAILED',
       );
     }
-    
+
     return this.enrichResponse(response.data);
   }
 
   async delete(endpoint: string, id: string): Promise<StateSetResponse> {
     const sanitizedId = validateAndSanitizeInput(SanitizedIdSchema, id, 'resource ID');
-    
+
     const response = await this.rateLimiter.enqueue(
       () => this.apiClient.delete(`${endpoint}/${sanitizedId}`),
-      `delete_${endpoint.replace('/', '')}`
+      `delete_${endpoint.replace('/', '')}`,
     );
-    
+
     if (response.status >= 400) {
       throw new APIError(
         `Failed to delete resource: ${response.statusText}`,
         response.status,
-        'DELETE_FAILED'
+        'DELETE_FAILED',
       );
     }
-    
+
     return this.enrichResponse(response.data);
   }
 
-  async list(endpoint: string, params: Record<string, unknown> = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RequestMetrics } }> {
+  async list(
+    endpoint: string,
+    params: Record<string, unknown> = {},
+  ): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RequestMetrics } }> {
     const response = await this.rateLimiter.enqueue(
       () => this.apiClient.get(endpoint, { params }),
-      `list_${endpoint.replace('/', '')}`
+      `list_${endpoint.replace('/', '')}`,
     );
-    
+
     if (response.status >= 400) {
       throw new APIError(
         `Failed to list resources: ${response.statusText}`,
         response.status,
-        'LIST_FAILED'
+        'LIST_FAILED',
       );
     }
-    
+
     return this.enrichListResponse(response.data);
   }
 

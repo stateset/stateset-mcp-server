@@ -5,7 +5,7 @@ export function broadcastResourceUpdate(
   resourceType: string,
   resourceId: string,
   action: 'created' | 'updated' | 'deleted',
-  data: any
+  data: any,
 ): void {
   // Broadcast to resource-specific channel (e.g., "orders" or "orders:123")
   wsManager.broadcast(resourceType, {

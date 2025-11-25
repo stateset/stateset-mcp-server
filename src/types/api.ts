@@ -236,4 +236,4 @@ export interface DeleteArgs {
 
 export interface GetArgs {
   id: string;
-} 
+}

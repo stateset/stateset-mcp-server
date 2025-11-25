@@ -1,4 +1,3 @@
-
 // Basic types
 export interface RateLimiterMetrics {
   totalRequests: number;
@@ -67,7 +66,7 @@ export interface ManufacturerOrderItem {
 export interface InvoiceItem {
   item_id: string;
   quantity: number;
-}   
+}
 
 export interface PaymentItem {
   item_id: string;
@@ -139,7 +138,7 @@ export interface UpdateRMAArgs {
   rma_id: string;
   status?: string;
   notes?: string;
-}   
+}
 
 export interface CreateOrderArgs {
   customer_email: string;
@@ -207,7 +206,7 @@ export interface CreateWorkOrderArgs {
 
 export interface UpdateWorkOrderArgs {
   work_order_id: string;
-  items: WorkOrderItem[];       
+  items: WorkOrderItem[];
   notes?: string;
 }
 
@@ -271,7 +270,7 @@ export interface CreateInvoiceArgs {
 
 export interface UpdateInvoiceArgs {
   invoice_id: string;
-  items: InvoiceItem[];     
+  items: InvoiceItem[];
   notes?: string;
 }
 
@@ -432,24 +431,60 @@ export interface DeleteInventoryArgs {
   inventory_id: string;
 }
 
-export interface GetRMAArgs { rma_id: string; }
-export interface GetOrderArgs { order_id: string; }
-export interface GetWarrantyArgs { warranty_id: string; }
-export interface GetShipmentArgs { shipment_id: string; }
-export interface GetBillOfMaterialsArgs { bill_of_materials_id: string; }
-export interface GetWorkOrderArgs { work_order_id: string; }
-export interface GetManufacturerOrderArgs { manufacturer_order_id: string; }
-export interface GetPurchaseOrderArgs { purchase_order_id: string; }
-export interface GetASNArgs { asn_id: string; }
-export interface GetInvoiceArgs { invoice_id: string; }
-export interface GetPaymentArgs { payment_id: string; }
-export interface GetSalesOrderArgs { sales_order_id: string; }
-export interface GetFulfillmentOrderArgs { fulfillment_order_id: string; }
-export interface GetItemReceiptArgs { item_receipt_id: string; }
-export interface GetCashSaleArgs { cash_sale_id: string; }
-export interface GetProductArgs { product_id: string; }
-export interface GetInventoryArgs { inventory_id: string; }
-export interface GetCustomerArgs { customer_id: string; }
+export interface GetRMAArgs {
+  rma_id: string;
+}
+export interface GetOrderArgs {
+  order_id: string;
+}
+export interface GetWarrantyArgs {
+  warranty_id: string;
+}
+export interface GetShipmentArgs {
+  shipment_id: string;
+}
+export interface GetBillOfMaterialsArgs {
+  bill_of_materials_id: string;
+}
+export interface GetWorkOrderArgs {
+  work_order_id: string;
+}
+export interface GetManufacturerOrderArgs {
+  manufacturer_order_id: string;
+}
+export interface GetPurchaseOrderArgs {
+  purchase_order_id: string;
+}
+export interface GetASNArgs {
+  asn_id: string;
+}
+export interface GetInvoiceArgs {
+  invoice_id: string;
+}
+export interface GetPaymentArgs {
+  payment_id: string;
+}
+export interface GetSalesOrderArgs {
+  sales_order_id: string;
+}
+export interface GetFulfillmentOrderArgs {
+  fulfillment_order_id: string;
+}
+export interface GetItemReceiptArgs {
+  item_receipt_id: string;
+}
+export interface GetCashSaleArgs {
+  cash_sale_id: string;
+}
+export interface GetProductArgs {
+  product_id: string;
+}
+export interface GetInventoryArgs {
+  inventory_id: string;
+}
+export interface GetCustomerArgs {
+  customer_id: string;
+}
 
 export interface ListArgs {
   page?: number;

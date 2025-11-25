@@ -241,7 +241,13 @@ export const customerSegmentationTool: Tool = {
         type: 'array',
         items: {
           type: 'string',
-          enum: ['purchase_frequency', 'average_order_value', 'lifetime_value', 'recency', 'product_preferences'],
+          enum: [
+            'purchase_frequency',
+            'average_order_value',
+            'lifetime_value',
+            'recency',
+            'product_preferences',
+          ],
         },
         description: 'Features to use for segmentation',
       },
@@ -302,7 +308,13 @@ export const businessInsightsTool: Tool = {
         type: 'array',
         items: {
           type: 'string',
-          enum: ['revenue_trends', 'customer_behavior', 'product_performance', 'operational_efficiency', 'market_opportunities'],
+          enum: [
+            'revenue_trends',
+            'customer_behavior',
+            'product_performance',
+            'operational_efficiency',
+            'market_opportunities',
+          ],
         },
         description: 'Types of insights to generate',
       },
@@ -356,10 +368,10 @@ export async function generateProductRecommendations(
   customerId: string,
   context: string,
   productIds: string[],
-  maxRecommendations: number
+  maxRecommendations: number,
 ): Promise<any> {
   const cacheKey = `recommendations:${customerId}:${context}:${productIds.join(',')}`;
-  
+
   // Check cache
   const cached = await cacheManager.get('recommendations', cacheKey);
   if (cached) {
@@ -370,12 +382,12 @@ export async function generateProductRecommendations(
   try {
     // In a real implementation, this would call an ML service
     // For now, we'll simulate with business logic
-    
+
     // Get customer order history
     // Note: In a real implementation, we would filter by customer
-    const orders = await client.listOrders({ 
-      page: 1, 
-      per_page: 50 
+    const orders = await client.listOrders({
+      page: 1,
+      per_page: 50,
     });
 
     // Get frequently bought together products
@@ -404,7 +416,7 @@ export async function generateSalesForecast(
   client: StateSetClient,
   period: string,
   duration: number,
-  productIds?: string[]
+  productIds?: string[],
 ): Promise<any> {
   try {
     // Get historical data
@@ -436,4 +448,4 @@ export async function generateSalesForecast(
     logger.error('Failed to generate sales forecast', error);
     throw error;
   }
-} 
+}

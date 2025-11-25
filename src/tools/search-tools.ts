@@ -4,7 +4,19 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 // Search schemas - exported for use by consumers
 export const SearchFilterSchema = z.object({
   field: z.string(),
-  operator: z.enum(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'nin', 'contains', 'starts_with', 'ends_with']),
+  operator: z.enum([
+    'eq',
+    'ne',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'in',
+    'nin',
+    'contains',
+    'starts_with',
+    'ends_with',
+  ]),
   value: z.any(),
 });
 
@@ -47,7 +59,19 @@ export const advancedSearchTool: Tool = {
             field: { type: 'string' },
             operator: {
               type: 'string',
-              enum: ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'nin', 'contains', 'starts_with', 'ends_with'],
+              enum: [
+                'eq',
+                'ne',
+                'gt',
+                'gte',
+                'lt',
+                'lte',
+                'in',
+                'nin',
+                'contains',
+                'starts_with',
+                'ends_with',
+              ],
             },
             value: {},
           },
@@ -372,9 +396,9 @@ export function buildSearchQuery(filters: any[], sort: any[], page: number, perP
   };
 
   // Process filters
-  filters.forEach(filter => {
+  filters.forEach((filter) => {
     const { field, operator, value } = filter;
-    
+
     switch (operator) {
       case 'eq':
         query.filters[field] = value;
@@ -413,9 +437,9 @@ export function buildSearchQuery(filters: any[], sort: any[], page: number, perP
   });
 
   // Process sort
-  sort.forEach(s => {
+  sort.forEach((s) => {
     query.sort[s.field] = s.order === 'desc' ? -1 : 1;
   });
 
   return query;
-} 
+}

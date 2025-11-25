@@ -66,10 +66,10 @@ export class HealthChecker extends EventEmitter {
 
   constructor() {
     super();
-    
+
     // Register default checks
     this.registerDefaultChecks();
-    
+
     // Start monitoring
     if (config.monitoring.enabled) {
       this.startMonitoring();
@@ -83,23 +83,19 @@ export class HealthChecker extends EventEmitter {
   }
 
   // Register an HTTP dependency check
-  registerHttpDependency(
-    name: string,
-    url: string,
-    options: DependencyCheckOptions = {}
-  ): void {
+  registerHttpDependency(name: string, url: string, options: DependencyCheckOptions = {}): void {
     const check: HealthCheckFunction = async () => {
       const start = Date.now();
-      
+
       try {
         const response = await axios.get(url, {
           timeout: options.timeout || 5000,
           validateStatus: () => true,
         });
-        
+
         const duration = Date.now() - start;
         const expectedStatus = options.expectedStatus || 200;
-        
+
         if (response.status === expectedStatus) {
           return {
             name,
@@ -145,11 +141,13 @@ export class HealthChecker extends EventEmitter {
 
         const result = await Promise.race([fn(), timeoutPromise]);
         this.lastResults.set(name, result);
-        
+
         // Record metrics
         metrics.observe('health_check_duration_ms', result.duration, { check: name });
-        metrics.set('health_check_status', result.status === HealthStatus.HEALTHY ? 1 : 0, { check: name });
-        
+        metrics.set('health_check_status', result.status === HealthStatus.HEALTHY ? 1 : 0, {
+          check: name,
+        });
+
         return result;
       } catch (error) {
         const result: HealthCheckResult = {
@@ -159,7 +157,7 @@ export class HealthChecker extends EventEmitter {
           duration: 0,
           timestamp: Date.now(),
         };
-        
+
         this.lastResults.set(name, result);
         return result;
       }
@@ -167,7 +165,7 @@ export class HealthChecker extends EventEmitter {
 
     const results = await Promise.all(checkPromises);
     const overallStatus = this.calculateOverallStatus(results);
-    
+
     const report: HealthReport = {
       status: overallStatus,
       timestamp: Date.now(),
@@ -186,12 +184,12 @@ export class HealthChecker extends EventEmitter {
 
     // Emit health status
     this.emit('health', report);
-    
+
     // Log if unhealthy
     if (overallStatus !== HealthStatus.HEALTHY) {
       logger.logHealthCheck('unhealthy', {
         status: overallStatus,
-        failedChecks: results.filter(r => r.status !== HealthStatus.HEALTHY).map(r => r.name),
+        failedChecks: results.filter((r) => r.status !== HealthStatus.HEALTHY).map((r) => r.name),
       });
     }
 
@@ -204,7 +202,7 @@ export class HealthChecker extends EventEmitter {
       // Basic liveness check - can we allocate memory and respond?
       const test = Buffer.alloc(1024);
       test.fill(0);
-      
+
       return {
         status: HealthStatus.HEALTHY,
         message: 'Service is alive',
@@ -220,7 +218,7 @@ export class HealthChecker extends EventEmitter {
   // Readiness probe (is the service ready to accept traffic?)
   async readiness(): Promise<{ status: HealthStatus; message: string; checks?: string[] }> {
     const report = await this.check();
-    
+
     if (report.status === HealthStatus.HEALTHY) {
       return {
         status: HealthStatus.HEALTHY,
@@ -228,9 +226,9 @@ export class HealthChecker extends EventEmitter {
       };
     } else {
       const failedChecks = report.checks
-        .filter(c => c.status !== HealthStatus.HEALTHY)
-        .map(c => c.name);
-      
+        .filter((c) => c.status !== HealthStatus.HEALTHY)
+        .map((c) => c.name);
+
       return {
         status: report.status,
         message: 'Service is not ready',
@@ -252,21 +250,21 @@ export class HealthChecker extends EventEmitter {
 
     // If any critical check fails, overall status is unhealthy
     const criticalFailure = results.some(
-      r => criticalChecks.includes(r.name) && r.status === HealthStatus.UNHEALTHY
+      (r) => criticalChecks.includes(r.name) && r.status === HealthStatus.UNHEALTHY,
     );
-    
+
     if (criticalFailure) {
       return HealthStatus.UNHEALTHY;
     }
 
     // If any check is unhealthy, overall status is degraded
-    const anyUnhealthy = results.some(r => r.status === HealthStatus.UNHEALTHY);
+    const anyUnhealthy = results.some((r) => r.status === HealthStatus.UNHEALTHY);
     if (anyUnhealthy) {
       return HealthStatus.DEGRADED;
     }
 
     // If any check is degraded, overall status is degraded
-    const anyDegraded = results.some(r => r.status === HealthStatus.DEGRADED);
+    const anyDegraded = results.some((r) => r.status === HealthStatus.DEGRADED);
     if (anyDegraded) {
       return HealthStatus.DEGRADED;
     }
@@ -281,10 +279,10 @@ export class HealthChecker extends EventEmitter {
       const start = Date.now();
       const usage = process.memoryUsage();
       const heapUsedPercent = (usage.heapUsed / usage.heapTotal) * 100;
-      
+
       let status = HealthStatus.HEALTHY;
       let message = `Heap used: ${heapUsedPercent.toFixed(2)}%`;
-      
+
       if (heapUsedPercent > 90) {
         status = HealthStatus.UNHEALTHY;
         message = `Heap usage critical: ${heapUsedPercent.toFixed(2)}%`;
@@ -311,10 +309,10 @@ export class HealthChecker extends EventEmitter {
     // Event loop check
     this.register('eventLoop', async () => {
       const start = Date.now();
-      
+
       let status = HealthStatus.HEALTHY;
       let message = `Event loop delay: ${this.eventLoopDelay.toFixed(2)}ms`;
-      
+
       if (this.eventLoopDelay > 100) {
         status = HealthStatus.UNHEALTHY;
         message = `Event loop blocked: ${this.eventLoopDelay.toFixed(2)}ms`;
@@ -362,14 +360,14 @@ export class HealthChecker extends EventEmitter {
   // Monitor event loop delay
   private startEventLoopMonitoring(): void {
     let lastCheck = Date.now();
-    
+
     this.eventLoopMonitor = setInterval(() => {
       const now = Date.now();
       const delay = now - lastCheck - 100; // Expected 100ms interval
-      
+
       // Use exponential moving average
       this.eventLoopDelay = this.eventLoopDelay * 0.9 + Math.max(0, delay) * 0.1;
-      
+
       lastCheck = now;
     }, 100);
   }
@@ -380,7 +378,7 @@ export class HealthChecker extends EventEmitter {
       clearInterval(this.checkInterval);
       this.checkInterval = undefined;
     }
-    
+
     if (this.eventLoopMonitor) {
       clearInterval(this.eventLoopMonitor);
       this.eventLoopMonitor = undefined;
@@ -402,7 +400,7 @@ export class HealthChecker extends EventEmitter {
           });
         }
       },
-      
+
       liveness: async (_req: any, res: any) => {
         try {
           const result = await this.liveness();
@@ -415,7 +413,7 @@ export class HealthChecker extends EventEmitter {
           });
         }
       },
-      
+
       readiness: async (_req: any, res: any) => {
         try {
           const result = await this.readiness();
@@ -439,10 +437,10 @@ export const healthChecker = new HealthChecker();
 export function registerHealthCheck(
   name: string,
   check: HealthCheckFunction,
-  options?: HealthCheckOptions
+  options?: HealthCheckOptions,
 ): void {
   healthChecker.register(name, check, options);
 }
 
 // Export types
-export type { HealthCheckFunction }; 
+export type { HealthCheckFunction };

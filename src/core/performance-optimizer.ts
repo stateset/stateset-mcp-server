@@ -59,7 +59,7 @@ export class PerformanceOptimizer extends EventEmitter {
 
   constructor(config: Partial<OptimizationConfig> = {}, metrics?: AdvancedMetrics) {
     super();
-    
+
     this.config = {
       enableGCOptimization: true,
       enableMemoryCompaction: true,
@@ -72,11 +72,11 @@ export class PerformanceOptimizer extends EventEmitter {
     };
 
     this.metrics = metrics || new AdvancedMetrics();
-    
+
     this.setupPerformanceObservers();
     this.startOptimization();
     this.startMonitoring();
-    
+
     logger.info('Performance optimizer initialized', { config: this.config });
   }
 
@@ -88,9 +88,9 @@ export class PerformanceOptimizer extends EventEmitter {
         this.handlePerformanceEntry(entry);
       }
     });
-    
+
     this.performanceObserver.observe({
-      entryTypes: ['measure', 'resource', 'function']
+      entryTypes: ['measure', 'resource', 'function'],
     });
 
     // GC observer
@@ -100,7 +100,7 @@ export class PerformanceOptimizer extends EventEmitter {
         this.handleGCEntry(entry);
       }
     });
-    
+
     this.gcObserver.observe({ entryTypes: ['gc'] });
   }
 
@@ -111,13 +111,14 @@ export class PerformanceOptimizer extends EventEmitter {
     });
 
     // Detect slow operations
-    if (entry.duration > 100) { // > 100ms
+    if (entry.duration > 100) {
+      // > 100ms
       logger.warn('Slow performance entry detected', {
         name: entry.name,
         type: entry.entryType,
         duration: entry.duration,
       });
-      
+
       this.metrics.incrementCounter('performance_slow_operations', 1, {
         entryType: entry.entryType,
       });
@@ -126,7 +127,7 @@ export class PerformanceOptimizer extends EventEmitter {
 
   private handleGCEntry(entry: globalThis.PerformanceEntry): void {
     const gcEntry = entry as any; // GC entries have additional properties
-    
+
     const gcStats: GCStats = {
       type: gcEntry.kind || 'unknown',
       duration: entry.duration,
@@ -134,22 +135,23 @@ export class PerformanceOptimizer extends EventEmitter {
       after: this.getMemoryProfile(),
       freedMemory: 0,
     };
-    
+
     gcStats.freedMemory = gcStats.before.heapUsed - gcStats.after.heapUsed;
-    
+
     this.metrics.recordHistogram('gc_duration_ms', entry.duration, {
       type: gcStats.type,
     });
-    
+
     this.metrics.setGauge('gc_freed_memory_bytes', gcStats.freedMemory);
-    
+
     logger.debug('GC event', gcStats);
-    
+
     // Trigger optimization if GC is frequent or slow
-    if (entry.duration > 50) { // > 50ms
+    if (entry.duration > 50) {
+      // > 50ms
       this.triggerOptimization('slow_gc');
     }
-    
+
     this.emit('gc', gcStats);
   }
 
@@ -168,29 +170,28 @@ export class PerformanceOptimizer extends EventEmitter {
 
   private async performOptimization(): Promise<void> {
     logger.debug('Starting performance optimization cycle');
-    
+
     const beforeProfile = this.getPerformanceProfile();
-    
+
     try {
       // Memory optimization
       if (this.config.enableMemoryCompaction) {
         await this.optimizeMemory();
       }
-      
+
       // GC optimization
       if (this.config.enableGCOptimization) {
         this.optimizeGarbageCollection();
       }
-      
+
       // Object pool cleanup
       if (this.config.enableObjectPooling) {
         this.cleanupObjectPools();
       }
-      
+
       const afterProfile = this.getPerformanceProfile();
-      
+
       this.logOptimizationResults(beforeProfile, afterProfile);
-      
     } catch (error) {
       logger.error('Performance optimization failed', { error });
       this.metrics.incrementCounter('performance_optimization_errors');
@@ -199,27 +200,27 @@ export class PerformanceOptimizer extends EventEmitter {
 
   private async optimizeMemory(): Promise<void> {
     const memoryUsage = process.memoryUsage();
-    
+
     // Force GC if memory usage is high
     if (global.gc && memoryUsage.heapUsed > this.config.gcThresholdMB * 1024 * 1024) {
       logger.info('Triggering manual garbage collection', {
         heapUsedMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
       });
-      
+
       const beforeGC = process.memoryUsage();
       global.gc();
       const afterGC = process.memoryUsage();
-      
+
       const freedMemory = beforeGC.heapUsed - afterGC.heapUsed;
-      
+
       this.metrics.incrementCounter('manual_gc_triggers');
       this.metrics.setGauge('manual_gc_freed_bytes', freedMemory);
-      
+
       logger.info('Manual GC completed', {
         freedMemoryMB: Math.round(freedMemory / 1024 / 1024),
       });
     }
-    
+
     // Clear internal caches if memory pressure is high
     if (memoryUsage.heapUsed > this.config.memoryWarningThresholdMB * 1024 * 1024) {
       this.emit('memoryPressure', { memoryUsage });
@@ -253,7 +254,7 @@ export class PerformanceOptimizer extends EventEmitter {
         totalCleaned += initialSize - maxPoolSize;
       }
     }
-    
+
     if (totalCleaned > 0) {
       logger.debug('Object pools cleaned up', { objectsRemoved: totalCleaned });
       this.metrics.incrementCounter('object_pool_cleanups', totalCleaned);
@@ -262,54 +263,54 @@ export class PerformanceOptimizer extends EventEmitter {
 
   private collectMetrics(): void {
     const profile = this.getPerformanceProfile();
-    
+
     // Memory metrics
     this.metrics.setGauge('process_memory_heap_used_bytes', profile.memory.heapUsed);
     this.metrics.setGauge('process_memory_heap_total_bytes', profile.memory.heapTotal);
     this.metrics.setGauge('process_memory_external_bytes', profile.memory.external);
     this.metrics.setGauge('process_memory_rss_bytes', profile.memory.rss);
-    
+
     // CPU metrics
     this.metrics.setGauge('process_cpu_usage_percent', profile.cpu.usage * 100);
     this.metrics.setGauge('process_cpu_user_seconds', profile.cpu.user / 1000000);
     this.metrics.setGauge('process_cpu_system_seconds', profile.cpu.system / 1000000);
-    
+
     // Event loop metrics
     this.metrics.recordHistogram('event_loop_lag_seconds', profile.eventLoop.lag / 1000);
     this.metrics.setGauge('event_loop_utilization_percent', profile.eventLoop.utilization * 100);
-    
+
     // Handle metrics
     this.metrics.setGauge('process_active_handles', profile.handles.active);
   }
 
   private checkPerformanceThresholds(): void {
     const profile = this.getPerformanceProfile();
-    
+
     // Check event loop lag
     if (profile.eventLoop.lag > this.config.eventLoopLagThresholdMs) {
       logger.warn('High event loop lag detected', {
         lagMs: profile.eventLoop.lag,
         thresholdMs: this.config.eventLoopLagThresholdMs,
       });
-      
+
       this.metrics.incrementCounter('performance_threshold_violations', 1, {
         type: 'event_loop_lag',
       });
-      
+
       this.emit('performanceIssue', {
         type: 'event_loop_lag',
         value: profile.eventLoop.lag,
         threshold: this.config.eventLoopLagThresholdMs,
       });
     }
-    
+
     // Check memory usage
     const memoryUsageMB = profile.memory.heapUsed / 1024 / 1024;
     if (memoryUsageMB > this.config.memoryWarningThresholdMB) {
       this.metrics.incrementCounter('performance_threshold_violations', 1, {
         type: 'memory_usage',
       });
-      
+
       this.emit('performanceIssue', {
         type: 'memory_usage',
         value: memoryUsageMB,
@@ -357,15 +358,15 @@ export class PerformanceOptimizer extends EventEmitter {
   private getPerformanceProfile(): PerformanceProfile {
     const currentCpuUsage = process.cpuUsage();
     const currentTime = Date.now();
-    
+
     const cpuDelta = process.cpuUsage(this.lastCpuUsage);
     const timeDelta = currentTime - this.lastCpuTime;
-    
+
     const cpuUsage = timeDelta > 0 ? (cpuDelta.user + cpuDelta.system) / (timeDelta * 1000) : 0;
-    
+
     this.lastCpuUsage = currentCpuUsage;
     this.lastCpuTime = currentTime;
-    
+
     return {
       cpu: {
         user: currentCpuUsage.user,
@@ -387,13 +388,13 @@ export class PerformanceOptimizer extends EventEmitter {
   private logOptimizationResults(before: PerformanceProfile, after: PerformanceProfile): void {
     const memoryDiff = before.memory.heapUsed - after.memory.heapUsed;
     const cpuDiff = after.cpu.usage - before.cpu.usage;
-    
+
     logger.info('Performance optimization completed', {
       memoryFreedMB: Math.round(memoryDiff / 1024 / 1024),
       cpuUsageChange: Math.round(cpuDiff * 100 * 100) / 100, // Percentage
       eventLoopLagMs: after.eventLoop.lag,
     });
-    
+
     this.metrics.recordHistogram('optimization_memory_freed_bytes', memoryDiff);
     this.metrics.recordHistogram('optimization_cpu_change_percent', cpuDiff * 100);
   }
@@ -403,18 +404,18 @@ export class PerformanceOptimizer extends EventEmitter {
     if (!this.config.enableObjectPooling) {
       return factory();
     }
-    
+
     if (!this.objectPools.has(poolName)) {
       this.objectPools.set(poolName, []);
     }
-    
+
     const pool = this.objectPools.get(poolName)!;
-    
+
     if (pool.length > 0) {
       this.metrics.incrementCounter('object_pool_hits', 1, { pool: poolName });
       return pool.pop();
     }
-    
+
     this.metrics.incrementCounter('object_pool_misses', 1, { pool: poolName });
     return factory();
   }
@@ -423,13 +424,13 @@ export class PerformanceOptimizer extends EventEmitter {
     if (!this.config.enableObjectPooling) {
       return;
     }
-    
+
     if (!this.objectPools.has(poolName)) {
       this.objectPools.set(poolName, []);
     }
-    
+
     const pool = this.objectPools.get(poolName)!;
-    
+
     // Limit pool size to prevent memory leaks
     if (pool.length < 50) {
       pool.push(object);
@@ -441,7 +442,7 @@ export class PerformanceOptimizer extends EventEmitter {
   triggerOptimization(reason: string): void {
     logger.info('Manual optimization triggered', { reason });
     this.metrics.incrementCounter('manual_optimization_triggers', 1, { reason });
-    
+
     // Run optimization in next tick to avoid blocking
     setImmediate(() => {
       this.performOptimization();
@@ -454,28 +455,28 @@ export class PerformanceOptimizer extends EventEmitter {
     const markStart = `${name}-start`;
     const markEnd = `${name}-end`;
     const measureName = `${name}-duration`;
-    
+
     performance.mark(markStart);
-    
+
     try {
       const result = await fn();
       performance.mark(markEnd);
       performance.measure(measureName, markStart, markEnd);
-      
+
       const duration = performance.now() - start;
       this.metrics.recordHistogram('profiled_function_duration_ms', duration, {
         function: name,
       });
-      
+
       return result;
     } catch (error) {
       performance.mark(markEnd);
       performance.measure(measureName, markStart, markEnd);
-      
+
       this.metrics.incrementCounter('profiled_function_errors', 1, {
         function: name,
       });
-      
+
       throw error;
     } finally {
       // Clean up marks to prevent memory leaks

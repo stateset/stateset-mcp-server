@@ -57,7 +57,7 @@ export class BatchProcessor<T, R> extends EventEmitter {
 
   constructor(
     private processor: (items: T[]) => Promise<R[]>,
-    config: Partial<BatchConfig> = {}
+    config: Partial<BatchConfig> = {},
   ) {
     super();
 
@@ -92,7 +92,7 @@ export class BatchProcessor<T, R> extends EventEmitter {
       priority?: number;
       timeout?: number;
       maxRetries?: number;
-    } = {}
+    } = {},
   ): Promise<R> {
     return new Promise((resolve, reject) => {
       const operation: BatchOperation<T, R> = {
@@ -110,7 +110,7 @@ export class BatchProcessor<T, R> extends EventEmitter {
 
       this.queue.push(operation);
       this.updateStats();
-      
+
       metrics.incrementCounter('batch_operations_queued', 1, {
         operation: operation.operation,
       });
@@ -134,7 +134,7 @@ export class BatchProcessor<T, R> extends EventEmitter {
         timeout?: number;
         maxRetries?: number;
       };
-    }>
+    }>,
   ): Promise<R[]> {
     const promises = items.map(({ data, options }) => this.add(data, options));
     return Promise.all(promises);
@@ -167,7 +167,7 @@ export class BatchProcessor<T, R> extends EventEmitter {
 
     // Check for high-priority operations
     if (this.config.enablePrioritization) {
-      const highPriorityCount = this.queue.filter(op => op.priority > 0.8).length;
+      const highPriorityCount = this.queue.filter((op) => op.priority > 0.8).length;
       if (highPriorityCount >= Math.min(10, this.config.maxBatchSize * 0.1)) {
         return true;
       }
@@ -175,10 +175,8 @@ export class BatchProcessor<T, R> extends EventEmitter {
 
     // Check for operations approaching timeout
     const now = Date.now();
-    const urgentCount = this.queue.filter(op => 
-      (now - op.timestamp) > (op.timeout * 0.8)
-    ).length;
-    
+    const urgentCount = this.queue.filter((op) => now - op.timestamp > op.timeout * 0.8).length;
+
     return urgentCount > 0;
   }
 
@@ -190,17 +188,19 @@ export class BatchProcessor<T, R> extends EventEmitter {
     // Adaptive batch sizing based on recent performance
     const avgProcessingTime = this.getAverageProcessingTime();
     const avgBatchSize = this.getAverageBatchSize();
-    
+
     // If processing is fast, increase batch size
-    if (avgProcessingTime < 100 && avgBatchSize > 0) { // < 100ms
+    if (avgProcessingTime < 100 && avgBatchSize > 0) {
+      // < 100ms
       return Math.min(this.config.maxBatchSize, Math.floor(avgBatchSize * 1.2));
     }
-    
+
     // If processing is slow, decrease batch size
-    if (avgProcessingTime > 1000) { // > 1s
+    if (avgProcessingTime > 1000) {
+      // > 1s
       return Math.max(10, Math.floor(avgBatchSize * 0.8));
     }
-    
+
     return this.config.maxBatchSize;
   }
 
@@ -212,12 +212,12 @@ export class BatchProcessor<T, R> extends EventEmitter {
     // Adaptive wait time based on queue size and recent throughput
     const queueRatio = this.queue.length / this.config.maxBatchSize;
     const basewaitTime = this.config.maxWaitTime;
-    
+
     // Reduce wait time if queue is filling up
     if (queueRatio > 0.5) {
       return Math.max(100, basewaitTime * (1 - queueRatio));
     }
-    
+
     return basewaitTime;
   }
 
@@ -236,7 +236,7 @@ export class BatchProcessor<T, R> extends EventEmitter {
       // Take batch from queue
       const batchSize = Math.min(this.queue.length, this.getAdaptiveBatchSize());
       const batch = this.queue.splice(0, batchSize);
-      
+
       logger.debug('Processing batch', {
         batchSize,
         remainingQueue: this.queue.length,
@@ -244,11 +244,11 @@ export class BatchProcessor<T, R> extends EventEmitter {
 
       // Check for timed-out operations
       const now = Date.now();
-      const timedOut = batch.filter(op => (now - op.timestamp) > op.timeout);
-      const valid = batch.filter(op => (now - op.timestamp) <= op.timeout);
+      const timedOut = batch.filter((op) => now - op.timestamp > op.timeout);
+      const valid = batch.filter((op) => now - op.timestamp <= op.timeout);
 
       // Reject timed-out operations
-      timedOut.forEach(op => {
+      timedOut.forEach((op) => {
         op.reject(new Error(`Operation timed out after ${op.timeout}ms`));
         metrics.incrementCounter('batch_operations_timeout', 1, {
           operation: op.operation,
@@ -263,18 +263,17 @@ export class BatchProcessor<T, R> extends EventEmitter {
 
       // Process the batch
       const profileOperation = valid[0]?.operation ?? 'default';
-      const results = await metrics.profile(
-        `batch_process_${profileOperation}`,
-        () => this.processor(valid.map(op => op.data))
+      const results = await metrics.profile(`batch_process_${profileOperation}`, () =>
+        this.processor(valid.map((op) => op.data)),
       );
 
       // Handle results
       const batchResults: BatchResult<R>[] = [];
-      
+
       for (let i = 0; i < valid.length; i++) {
         const operation = valid[i]!;
         const processingTime = Date.now() - operation.timestamp;
-        
+
         if (i < results.length && results[i] !== undefined) {
           // Success
           operation.resolve(results[i] as R);
@@ -284,7 +283,7 @@ export class BatchProcessor<T, R> extends EventEmitter {
             result: results[i],
             processingTime,
           });
-          
+
           this.stats.successfulOperations++;
           metrics.incrementCounter('batch_operations_success', 1, {
             operation: operation.operation,
@@ -299,7 +298,7 @@ export class BatchProcessor<T, R> extends EventEmitter {
             error,
             processingTime,
           });
-          
+
           this.stats.failedOperations++;
           metrics.incrementCounter('batch_operations_error', 1, {
             operation: operation.operation,
@@ -310,34 +309,33 @@ export class BatchProcessor<T, R> extends EventEmitter {
       // Update statistics
       const processingTime = Date.now() - startTime;
       this.updateProcessingStats(batchSize, processingTime);
-      
+
       metrics.recordHistogram('batch_processing_duration_seconds', processingTime / 1000);
       metrics.setGauge('batch_queue_size', this.queue.length);
-      
+
       this.emit('batchProcessed', {
         batchSize: valid.length,
         results: batchResults,
         processingTime,
       });
-
     } catch (error) {
       logger.error('Batch processing failed', { error });
-      
+
       // Handle batch failure - retry eligible operations
       const batch = this.queue.splice(0, Math.min(this.queue.length, this.getAdaptiveBatchSize()));
-      
+
       for (const operation of batch) {
         if (operation.retries < operation.maxRetries) {
           operation.retries++;
           this.queue.unshift(operation); // Add back to front for retry
-          
+
           metrics.incrementCounter('batch_operations_retry', 1, {
             operation: operation.operation,
           });
         } else {
           operation.reject(error as Error);
           this.stats.failedOperations++;
-          
+
           metrics.incrementCounter('batch_operations_failed', 1, {
             operation: operation.operation,
           });
@@ -346,7 +344,7 @@ export class BatchProcessor<T, R> extends EventEmitter {
     } finally {
       this.processing = false;
       this.updateStats();
-      
+
       // Schedule next batch if queue is not empty
       if (this.queue.length > 0) {
         this.scheduleProcessing();
@@ -356,11 +354,11 @@ export class BatchProcessor<T, R> extends EventEmitter {
 
   private updateProcessingStats(batchSize: number, processingTime: number): void {
     this.stats.totalProcessed += batchSize;
-    
+
     // Update recent batch sizes and processing times
     this.recentBatchSizes.push(batchSize);
     this.recentProcessingTimes.push(processingTime);
-    
+
     // Keep only last 100 measurements
     if (this.recentBatchSizes.length > 100) {
       this.recentBatchSizes.splice(0, this.recentBatchSizes.length - 100);
@@ -368,11 +366,11 @@ export class BatchProcessor<T, R> extends EventEmitter {
     if (this.recentProcessingTimes.length > 100) {
       this.recentProcessingTimes.splice(0, this.recentProcessingTimes.length - 100);
     }
-    
+
     // Update averages
     this.stats.averageBatchSize = this.getAverageBatchSize();
     this.stats.averageProcessingTime = this.getAverageProcessingTime();
-    
+
     // Update throughput
     const now = Date.now();
     const timeSinceLastProcess = now - this.lastProcessTime;
@@ -393,7 +391,9 @@ export class BatchProcessor<T, R> extends EventEmitter {
 
   private getAverageProcessingTime(): number {
     if (this.recentProcessingTimes.length === 0) return 0;
-    return this.recentProcessingTimes.reduce((a, b) => a + b, 0) / this.recentProcessingTimes.length;
+    return (
+      this.recentProcessingTimes.reduce((a, b) => a + b, 0) / this.recentProcessingTimes.length
+    );
   }
 
   // Queue management
@@ -409,7 +409,7 @@ export class BatchProcessor<T, R> extends EventEmitter {
     retries: number;
   }> {
     const now = Date.now();
-    return this.queue.map(op => ({
+    return this.queue.map((op) => ({
       id: op.id,
       operation: op.operation,
       priority: op.priority,
@@ -420,37 +420,40 @@ export class BatchProcessor<T, R> extends EventEmitter {
 
   clearQueue(): number {
     const count = this.queue.length;
-    
+
     // Reject all queued operations
-    this.queue.forEach(op => {
+    this.queue.forEach((op) => {
       op.reject(new Error('Queue cleared'));
     });
-    
+
     this.queue = [];
     this.updateStats();
-    
+
     metrics.incrementCounter('batch_operations_cleared', count);
-    
+
     logger.info('Queue cleared', { clearedOperations: count });
     return count;
   }
 
   // Priority management
-  reprioritize(predicate: (operation: BatchOperation<T, R>) => boolean, newPriority: number): number {
+  reprioritize(
+    predicate: (operation: BatchOperation<T, R>) => boolean,
+    newPriority: number,
+  ): number {
     let updated = 0;
-    
+
     for (const operation of this.queue) {
       if (predicate(operation)) {
         operation.priority = newPriority;
         updated++;
       }
     }
-    
+
     if (updated > 0 && this.config.enablePrioritization) {
       this.queue.sort((a, b) => b.priority - a.priority);
       logger.debug('Operations reprioritized', { updated, newPriority });
     }
-    
+
     return updated;
   }
 
@@ -467,34 +470,35 @@ export class BatchProcessor<T, R> extends EventEmitter {
     issues: string[];
   } {
     const issues: string[] = [];
-    
+
     const queueUtilization = this.queue.length / this.config.maxBatchSize;
     const totalOps = this.stats.successfulOperations + this.stats.failedOperations;
     const errorRate = totalOps > 0 ? this.stats.failedOperations / totalOps : 0;
-    
+
     // Check for issues
     if (queueUtilization > 0.8) {
       issues.push('High queue utilization');
     }
-    
+
     if (errorRate > 0.1) {
       issues.push('High error rate');
     }
-    
+
     if (this.stats.averageProcessingTime > 5000) {
       issues.push('High processing latency');
     }
-    
+
     const now = Date.now();
-    const oldestOperation = this.queue.reduce((oldest, op) => 
-      op.timestamp < oldest ? op.timestamp : oldest, now
+    const oldestOperation = this.queue.reduce(
+      (oldest, op) => (op.timestamp < oldest ? op.timestamp : oldest),
+      now,
     );
     const averageWaitTime = this.queue.length > 0 ? now - oldestOperation : 0;
-    
+
     if (averageWaitTime > 10000) {
       issues.push('Operations waiting too long');
     }
-    
+
     return {
       healthy: issues.length === 0,
       queueUtilization,
@@ -507,17 +511,17 @@ export class BatchProcessor<T, R> extends EventEmitter {
   // Lifecycle management
   async drain(): Promise<void> {
     logger.info('Draining batch processor', { queueSize: this.queue.length });
-    
+
     // Process remaining batches
     while (this.queue.length > 0 && !this.processing) {
       await this.processBatch();
     }
-    
+
     // Wait for current processing to finish
     while (this.processing) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    
+
     logger.info('Batch processor drained');
   }
 
@@ -525,15 +529,15 @@ export class BatchProcessor<T, R> extends EventEmitter {
     if (this.batchTimer) {
       clearTimeout(this.batchTimer);
     }
-    
+
     // Reject all remaining operations
-    this.queue.forEach(op => {
+    this.queue.forEach((op) => {
       op.reject(new Error('Processor destroyed'));
     });
-    
+
     this.queue = [];
     this.removeAllListeners();
-    
+
     logger.info('Batch processor destroyed');
   }
 }

@@ -48,7 +48,7 @@ export const corsOptions = cors({
     if (!origin) return callback(null, true);
 
     const allowedOrigins = config.security?.allowedOrigins || ['http://localhost:3000'];
-    
+
     if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -80,7 +80,7 @@ export const compressionMiddleware = compression({
 export const sanitizeRequest: RequestHandler = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   // Remove any null bytes from request
   const sanitizeValue = (value: any): any => {
@@ -108,11 +108,7 @@ export const sanitizeRequest: RequestHandler = (
 };
 
 // API key validation middleware
-export const validateApiKey: RequestHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const validateApiKey: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
   const apiKey = req.headers['x-api-key'] || req.headers.authorization?.replace('Bearer ', '');
 
   if (!apiKey) {
@@ -142,19 +138,15 @@ export const validateApiKey: RequestHandler = (
 };
 
 // IP whitelist middleware
-export const ipWhitelist: RequestHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const ipWhitelist: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
   const whitelist = config.security?.ipWhitelist || [];
-  
+
   if (whitelist.length === 0) {
     return next(); // No whitelist configured
   }
 
   const clientIp = req.ip || req.connection.remoteAddress;
-  
+
   if (!clientIp || !whitelist.includes(clientIp)) {
     logger.warn({ ip: clientIp, path: req.path }, 'IP not in whitelist');
     return res.status(403).json({
@@ -175,7 +167,7 @@ export const requestSizeLimit = (limit: string = '10mb'): RequestHandler => {
     if (contentLength > maxSize) {
       logger.warn(
         { ip: req.ip, path: req.path, contentLength, maxSize },
-        'Request size exceeds limit'
+        'Request size exceeds limit',
       );
       return res.status(413).json({
         error: 'Payload Too Large',
@@ -212,11 +204,7 @@ function parseSize(size: string): number {
 }
 
 // Security audit logging
-export const auditLog: RequestHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const auditLog: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
   const startTime = Date.now();
 
   // Log request
@@ -255,4 +243,4 @@ export const security = [
   compressionMiddleware,
   sanitizeRequest,
   requestSizeLimit('10mb'),
-]; 
+];

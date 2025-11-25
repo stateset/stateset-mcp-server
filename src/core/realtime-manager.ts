@@ -66,9 +66,9 @@ export class RealtimeManager extends EventEmitter {
 
   constructor(port: number = 8080, metrics?: AdvancedMetrics) {
     super();
-    
+
     this.metrics = metrics || new AdvancedMetrics();
-    
+
     this.stats = {
       totalConnections: 0,
       activeConnections: 0,
@@ -96,7 +96,7 @@ export class RealtimeManager extends EventEmitter {
     this.setupWebSocketServer();
     this.startHeartbeat();
     this.startCleanup();
-    
+
     logger.info('Realtime manager initialized', { port });
   }
 
@@ -131,7 +131,7 @@ export class RealtimeManager extends EventEmitter {
 
     this.connections.set(connectionId, connection);
     this.updateStats();
-    
+
     logger.info('WebSocket connection established', {
       connectionId,
       ip,
@@ -182,7 +182,7 @@ export class RealtimeManager extends EventEmitter {
       const message = JSON.parse(data.toString());
       connection.metadata.lastActivity = Date.now();
       connection.metadata.messageCount++;
-      
+
       this.stats.totalMessagesReceived++;
       this.metrics.incrementCounter('websocket_messages_received');
 
@@ -217,7 +217,7 @@ export class RealtimeManager extends EventEmitter {
   private handleSubscribe(connection: WebSocketConnection, message: any): void {
     try {
       const { channel, filter } = message;
-      
+
       if (!channel || typeof channel !== 'string') {
         this.sendError(connection, 'Channel name is required');
         return;
@@ -239,7 +239,7 @@ export class RealtimeManager extends EventEmitter {
       connection.subscriptions.add(sanitizedChannel);
 
       this.updateStats();
-      
+
       logger.debug('WebSocket subscription added', {
         connectionId: connection.id,
         channel: sanitizedChannel,
@@ -260,7 +260,6 @@ export class RealtimeManager extends EventEmitter {
 
       // Send buffered messages for this channel
       this.deliverBufferedMessages(connection.id, sanitizedChannel);
-
     } catch (error) {
       this.sendError(connection, `Subscription failed: ${(error as Error).message}`);
     }
@@ -269,7 +268,7 @@ export class RealtimeManager extends EventEmitter {
   private handleUnsubscribe(connection: WebSocketConnection, message: any): void {
     try {
       const { channel } = message;
-      
+
       if (!channel || typeof channel !== 'string') {
         this.sendError(connection, 'Channel name is required');
         return;
@@ -308,7 +307,6 @@ export class RealtimeManager extends EventEmitter {
         timestamp: Date.now(),
         id: this.generateMessageId(),
       });
-
     } catch (error) {
       this.sendError(connection, `Unsubscription failed: ${(error as Error).message}`);
     }
@@ -376,7 +374,7 @@ export class RealtimeManager extends EventEmitter {
     };
 
     this.broadcastToChannel(channel, message, eventData);
-    
+
     logger.debug('Event broadcasted', {
       channel,
       eventType: eventData.eventType,
@@ -391,9 +389,9 @@ export class RealtimeManager extends EventEmitter {
   }
 
   private broadcastToChannel(
-    channel: string, 
-    message: RealtimeMessage, 
-    eventData?: EventData
+    channel: string,
+    message: RealtimeMessage,
+    eventData?: EventData,
   ): void {
     const connectionIds = this.channels.get(channel);
     if (!connectionIds || connectionIds.size === 0) {
@@ -414,7 +412,7 @@ export class RealtimeManager extends EventEmitter {
       // Check if message matches subscription filter
       const subscriptionId = `${connectionId}:${channel}`;
       const filter = this.subscriptions.get(subscriptionId);
-      
+
       if (filter && eventData && !this.matchesFilter(eventData, filter)) {
         continue;
       }
@@ -442,10 +440,10 @@ export class RealtimeManager extends EventEmitter {
 
       const messageStr = JSON.stringify(message);
       connection.ws.send(messageStr);
-      
+
       this.stats.totalMessagesSent++;
       this.metrics.incrementCounter('websocket_messages_sent');
-      
+
       return true;
     } catch (error) {
       logger.warn('Failed to send WebSocket message', {
@@ -475,19 +473,19 @@ export class RealtimeManager extends EventEmitter {
     if (filter.resourceType && filter.resourceType !== eventData.resourceType) {
       return false;
     }
-    
+
     if (filter.resourceId && filter.resourceId !== eventData.resourceId) {
       return false;
     }
-    
+
     if (filter.eventType && filter.eventType !== eventData.eventType) {
       return false;
     }
-    
+
     if (filter.userId && filter.userId !== eventData.userId) {
       return false;
     }
-    
+
     return true;
   }
 
@@ -501,10 +499,10 @@ export class RealtimeManager extends EventEmitter {
     if (!this.messageBuffer.has(channel)) {
       this.messageBuffer.set(channel, []);
     }
-    
+
     const buffer = this.messageBuffer.get(channel)!;
     buffer.push(message);
-    
+
     // Keep only last 100 messages per channel
     if (buffer.length > 100) {
       buffer.splice(0, buffer.length - 100);
@@ -542,8 +540,9 @@ export class RealtimeManager extends EventEmitter {
     for (const connection of this.connections.values()) {
       // Check if connection is stale
       const timeSinceActivity = now - connection.metadata.lastActivity;
-      
-      if (timeSinceActivity > 60000) { // 1 minute without activity
+
+      if (timeSinceActivity > 60000) {
+        // 1 minute without activity
         // Send ping to check if connection is still alive
         if (connection.ws.readyState === WebSocket.OPEN) {
           connection.ws.ping();
@@ -570,9 +569,11 @@ export class RealtimeManager extends EventEmitter {
     // Find stale connections
     for (const [connectionId, connection] of this.connections) {
       const timeSinceActivity = now - connection.metadata.lastActivity;
-      
-      if (timeSinceActivity > 300000 || // 5 minutes without activity
-          connection.ws.readyState !== WebSocket.OPEN) {
+
+      if (
+        timeSinceActivity > 300000 || // 5 minutes without activity
+        connection.ws.readyState !== WebSocket.OPEN
+      ) {
         staleConnections.push(connectionId);
       }
     }
@@ -584,7 +585,7 @@ export class RealtimeManager extends EventEmitter {
 
     // Clean up old buffered messages
     for (const [channel, buffer] of this.messageBuffer) {
-      const filtered = buffer.filter(msg => (now - msg.timestamp) < 3600000); // Keep last hour
+      const filtered = buffer.filter((msg) => now - msg.timestamp < 3600000); // Keep last hour
       this.messageBuffer.set(channel, filtered);
     }
 
@@ -594,9 +595,11 @@ export class RealtimeManager extends EventEmitter {
   }
 
   private getClientIP(request: IncomingMessage): string {
-    return (request.headers['x-forwarded-for'] as string)?.split(',')[0] ||
-           request.connection.remoteAddress ||
-           'unknown';
+    return (
+      (request.headers['x-forwarded-for'] as string)?.split(',')[0] ||
+      request.connection.remoteAddress ||
+      'unknown'
+    );
   }
 
   private generateMessageId(): string {
@@ -605,9 +608,11 @@ export class RealtimeManager extends EventEmitter {
 
   private updateStats(): void {
     this.stats.activeConnections = this.connections.size;
-    this.stats.totalSubscriptions = Array.from(this.connections.values())
-      .reduce((total, conn) => total + conn.subscriptions.size, 0);
-    
+    this.stats.totalSubscriptions = Array.from(this.connections.values()).reduce(
+      (total, conn) => total + conn.subscriptions.size,
+      0,
+    );
+
     // Update channel stats
     this.stats.channels.clear();
     for (const [channel, connectionIds] of this.channels) {
@@ -625,7 +630,7 @@ export class RealtimeManager extends EventEmitter {
     subscriptions: string[];
     metadata: WebSocketConnection['metadata'];
   }> {
-    return Array.from(this.connections.values()).map(conn => ({
+    return Array.from(this.connections.values()).map((conn) => ({
       id: conn.id,
       subscriptions: Array.from(conn.subscriptions),
       metadata: { ...conn.metadata },
@@ -680,7 +685,7 @@ export class RealtimeManager extends EventEmitter {
 
     this.wss.close();
     this.removeAllListeners();
-    
+
     logger.info('Realtime manager destroyed');
   }
 }

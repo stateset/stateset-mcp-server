@@ -112,7 +112,7 @@ export class WebSocketManager extends EventEmitter {
    */
   broadcast(channel: string, data: any): void {
     const subscriptionIds = this.channels.get(channel) || new Set();
-    
+
     subscriptionIds.forEach((subscriptionId) => {
       const subscription = this.subscriptions.get(subscriptionId);
       if (subscription && subscription.ws.readyState === WebSocket.OPEN) {
@@ -275,4 +275,4 @@ export class WebSocketManager extends EventEmitter {
 }
 
 // Export singleton instance
-export const wsManager = WebSocketManager.getInstance(); 
+export const wsManager = WebSocketManager.getInstance();

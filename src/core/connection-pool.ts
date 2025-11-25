@@ -1,4 +1,9 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, {
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosError,
+  InternalAxiosRequestConfig,
+} from 'axios';
 import { EventEmitter } from 'events';
 import { createLogger } from '../utils/logger';
 
@@ -72,19 +77,21 @@ export class ConnectionPool extends EventEmitter {
   constructor(config: ConnectionPoolConfig) {
     super();
     this.config = config;
-    
+
     this.retryConfig = {
       maxRetries: config.rateLimit.retryAttempts,
       baseDelay: config.rateLimit.retryDelay,
       maxDelay: 30000,
       backoffFactor: 2,
       retryCondition: (error: AxiosError) => {
-        return !error.response || 
-               error.code === 'ECONNABORTED' ||
-               error.code === 'ENOTFOUND' ||
-               error.code === 'ECONNRESET' ||
-               (error.response.status >= 500) ||
-               error.response.status === 429;
+        return (
+          !error.response ||
+          error.code === 'ECONNABORTED' ||
+          error.code === 'ENOTFOUND' ||
+          error.code === 'ECONNRESET' ||
+          error.response.status >= 500 ||
+          error.response.status === 429
+        );
       },
     };
 
@@ -103,7 +110,7 @@ export class ConnectionPool extends EventEmitter {
       baseURL: config.api.baseUrl,
       timeout: config.api.timeout,
       headers: {
-        'Authorization': `Bearer ${config.api.key}`,
+        Authorization: `Bearer ${config.api.key}`,
         'Content-Type': 'application/json',
         'User-Agent': `${config.server.name}/${config.server.version}`,
       },
@@ -114,16 +121,16 @@ export class ConnectionPool extends EventEmitter {
     this.initializePool();
     this.startHealthChecks();
     this.startCleanup();
-    
-    logger.info('Connection pool initialized', { 
+
+    logger.info('Connection pool initialized', {
       maxConnections: this.getMaxConnections(),
-      retryConfig: this.retryConfig 
+      retryConfig: this.retryConfig,
     });
   }
 
   private initializePool(): void {
     const minConnections = Math.max(2, Math.floor(this.getMaxConnections() * 0.2));
-    
+
     for (let i = 0; i < minConnections; i++) {
       this.createConnection();
     }
@@ -131,7 +138,7 @@ export class ConnectionPool extends EventEmitter {
 
   private createConnection(): PoolConnection {
     const id = `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const instance = axios.create({
       ...this.baseAxiosConfig,
       // Add connection-specific config
@@ -157,10 +164,10 @@ export class ConnectionPool extends EventEmitter {
 
     this.connections.set(id, connection);
     this.updateStats();
-    
+
     logger.debug('Connection created', { id, totalConnections: this.connections.size });
     this.emit('connectionCreated', { id });
-    
+
     return connection;
   }
 
@@ -169,16 +176,16 @@ export class ConnectionPool extends EventEmitter {
     instance.interceptors.request.use(
       (config: InstrumentedRequestConfig) => {
         const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        config.metadata = { 
-          requestId, 
+        config.metadata = {
+          requestId,
           connectionId,
-          startTime: Date.now() 
+          startTime: Date.now(),
         };
 
         logger.debug('Request sent', { requestId, connectionId, url: config.url });
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => Promise.reject(error),
     );
 
     // Response interceptor
@@ -191,16 +198,16 @@ export class ConnectionPool extends EventEmitter {
           connection.latency.push(duration);
           connection.requestCount++;
           connection.lastUsed = Date.now();
-          
+
           // Keep only last 100 latency measurements
           if (connection.latency.length > 100) {
             connection.latency.splice(0, connection.latency.length - 100);
           }
-          
+
           this.stats.totalRequests++;
           this.updateAverageLatency();
         }
-        
+
         return response;
       },
       (error) => {
@@ -209,22 +216,21 @@ export class ConnectionPool extends EventEmitter {
           connection.errorCount++;
           this.stats.failedRequests++;
         }
-        
+
         return Promise.reject(error);
-      }
+      },
     );
   }
 
   async request<T>(config: AxiosRequestConfig): Promise<T> {
     const connection = await this.acquireConnection();
-    
+
     try {
       connection.inUse = true;
       this.updateStats();
-      
+
       const response = await this.executeWithRetry(connection.instance, config);
       return response.data;
-      
     } finally {
       connection.inUse = false;
       this.updateStats();
@@ -232,41 +238,44 @@ export class ConnectionPool extends EventEmitter {
   }
 
   private async executeWithRetry(
-    instance: AxiosInstance, 
+    instance: AxiosInstance,
     config: AxiosRequestConfig,
-    attempt = 1
+    attempt = 1,
   ): Promise<any> {
     try {
       return await instance.request(config);
     } catch (error) {
-      if (attempt >= this.retryConfig.maxRetries || 
-          !this.retryConfig.retryCondition(error as AxiosError)) {
+      if (
+        attempt >= this.retryConfig.maxRetries ||
+        !this.retryConfig.retryCondition(error as AxiosError)
+      ) {
         throw error;
       }
 
       const delay = Math.min(
         this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffFactor, attempt - 1),
-        this.retryConfig.maxDelay
+        this.retryConfig.maxDelay,
       );
 
       // Add jitter to prevent thundering herd
       const jitteredDelay = delay + Math.random() * 1000;
 
-      logger.warn('Request failed, retrying', { 
-        attempt, 
-        delay: jitteredDelay, 
-        error: (error as AxiosError).message 
+      logger.warn('Request failed, retrying', {
+        attempt,
+        delay: jitteredDelay,
+        error: (error as AxiosError).message,
       });
 
-      await new Promise(resolve => setTimeout(resolve, jitteredDelay));
+      await new Promise((resolve) => setTimeout(resolve, jitteredDelay));
       return this.executeWithRetry(instance, config, attempt + 1);
     }
   }
 
   private async acquireConnection(): Promise<PoolConnection> {
     // Try to find an idle connection
-    const idleConnection = Array.from(this.connections.values())
-      .find(conn => !conn.inUse && this.isConnectionHealthy(conn));
+    const idleConnection = Array.from(this.connections.values()).find(
+      (conn) => !conn.inUse && this.isConnectionHealthy(conn),
+    );
 
     if (idleConnection) {
       return idleConnection;
@@ -284,8 +293,9 @@ export class ConnectionPool extends EventEmitter {
       }, 30000); // 30 second timeout
 
       const checkForConnection = () => {
-        const available = Array.from(this.connections.values())
-          .find(conn => !conn.inUse && this.isConnectionHealthy(conn));
+        const available = Array.from(this.connections.values()).find(
+          (conn) => !conn.inUse && this.isConnectionHealthy(conn),
+        );
 
         if (available) {
           clearTimeout(timeout);
@@ -305,13 +315,10 @@ export class ConnectionPool extends EventEmitter {
     const maxErrorRate = 0.1; // 10%
 
     const age = Date.now() - connection.created;
-    const errorRate = connection.requestCount > 0 
-      ? connection.errorCount / connection.requestCount 
-      : 0;
+    const errorRate =
+      connection.requestCount > 0 ? connection.errorCount / connection.requestCount : 0;
 
-    return age < maxAge && 
-           connection.errorCount < maxErrors && 
-           errorRate < maxErrorRate;
+    return age < maxAge && connection.errorCount < maxErrors && errorRate < maxErrorRate;
   }
 
   private getMaxConnections(): number {
@@ -327,23 +334,23 @@ export class ConnectionPool extends EventEmitter {
 
   private async performHealthChecks(): Promise<void> {
     const healthPromises = Array.from(this.connections.values())
-      .filter(conn => !conn.inUse)
+      .filter((conn) => !conn.inUse)
       .map(async (connection) => {
         try {
           // Simple health check request
           await connection.instance.get('/health', { timeout: 5000 });
           return { id: connection.id, healthy: true };
         } catch (error) {
-          logger.warn('Connection health check failed', { 
-            id: connection.id, 
-            error: (error as Error).message 
+          logger.warn('Connection health check failed', {
+            id: connection.id,
+            error: (error as Error).message,
           });
           return { id: connection.id, healthy: false };
         }
       });
 
     const results = await Promise.allSettled(healthPromises);
-    
+
     results.forEach((result) => {
       if (result.status === 'fulfilled' && !result.value.healthy) {
         this.removeConnection(result.value.id);
@@ -366,19 +373,17 @@ export class ConnectionPool extends EventEmitter {
 
     for (const [id, connection] of this.connections) {
       const idleTime = now - connection.lastUsed;
-      
-      if (!connection.inUse && 
-          idleTime > maxIdleTime && 
-          this.connections.size > minConnections) {
+
+      if (!connection.inUse && idleTime > maxIdleTime && this.connections.size > minConnections) {
         this.removeConnection(id);
         removedCount++;
       }
     }
 
     if (removedCount > 0) {
-      logger.debug('Connection cleanup completed', { 
-        removed: removedCount, 
-        remaining: this.connections.size 
+      logger.debug('Connection cleanup completed', {
+        removed: removedCount,
+        remaining: this.connections.size,
       });
     }
   }
@@ -395,19 +400,19 @@ export class ConnectionPool extends EventEmitter {
 
   private updateStats(): void {
     const connections = Array.from(this.connections.values());
-    
+
     this.stats.totalConnections = connections.length;
-    this.stats.activeConnections = connections.filter(c => c.inUse).length;
-    this.stats.idleConnections = connections.filter(c => !c.inUse).length;
-    this.stats.poolUtilization = this.stats.totalConnections > 0 
-      ? this.stats.activeConnections / this.stats.totalConnections 
-      : 0;
+    this.stats.activeConnections = connections.filter((c) => c.inUse).length;
+    this.stats.idleConnections = connections.filter((c) => !c.inUse).length;
+    this.stats.poolUtilization =
+      this.stats.totalConnections > 0
+        ? this.stats.activeConnections / this.stats.totalConnections
+        : 0;
   }
 
   private updateAverageLatency(): void {
-    const allLatencies = Array.from(this.connections.values())
-      .flatMap(conn => conn.latency);
-    
+    const allLatencies = Array.from(this.connections.values()).flatMap((conn) => conn.latency);
+
     if (allLatencies.length > 0) {
       this.stats.averageLatency = allLatencies.reduce((a, b) => a + b, 0) / allLatencies.length;
     }
@@ -421,7 +426,7 @@ export class ConnectionPool extends EventEmitter {
     // Process in batches to avoid overwhelming the pool
     for (let i = 0; i < requests.length; i += batchSize) {
       const batch = requests.slice(i, i + batchSize);
-      
+
       const batchPromises = batch.map(async (config) => {
         try {
           return await this.request<T>(config);
@@ -449,30 +454,29 @@ export class ConnectionPool extends EventEmitter {
     errorCount: number;
     averageLatency: number;
   }> {
-    return Array.from(this.connections.values()).map(conn => ({
+    return Array.from(this.connections.values()).map((conn) => ({
       id: conn.id,
       inUse: conn.inUse,
       age: Date.now() - conn.created,
       requestCount: conn.requestCount,
       errorCount: conn.errorCount,
-      averageLatency: conn.latency.length > 0 
-        ? conn.latency.reduce((a, b) => a + b, 0) / conn.latency.length 
-        : 0,
+      averageLatency:
+        conn.latency.length > 0 ? conn.latency.reduce((a, b) => a + b, 0) / conn.latency.length : 0,
     }));
   }
 
   async drain(): Promise<void> {
     logger.info('Draining connection pool');
-    
+
     // Wait for active connections to finish
     while (this.stats.activeConnections > 0) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    
+
     // Clear all connections
     this.connections.clear();
     this.updateStats();
-    
+
     logger.info('Connection pool drained');
   }
 
@@ -480,14 +484,14 @@ export class ConnectionPool extends EventEmitter {
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
     }
-    
+
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
     }
 
     this.connections.clear();
     this.removeAllListeners();
-    
+
     logger.info('Connection pool destroyed');
   }
 }

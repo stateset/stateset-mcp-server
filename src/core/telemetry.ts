@@ -35,7 +35,7 @@ export class TelemetryService {
           [SemanticResourceAttributes.SERVICE_NAME]: 'stateset-mcp-server',
           [SemanticResourceAttributes.SERVICE_VERSION]: '1.0.0',
           [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: config.server.environment,
-        })
+        }),
       );
 
       // Prometheus exporter for metrics
@@ -46,7 +46,7 @@ export class TelemetryService {
         },
         () => {
           logger.info('Prometheus metrics server started on port 9464');
-        }
+        },
       );
 
       // Create SDK - PrometheusExporter is a metric reader
@@ -89,7 +89,7 @@ export class TelemetryService {
       kind?: SpanKind;
       attributes?: Record<string, any>;
       parentSpan?: Span;
-    }
+    },
   ): Span {
     const spanOptions = {
       kind: options?.kind || SpanKind.INTERNAL,
@@ -111,7 +111,7 @@ export class TelemetryService {
     options?: {
       attributes?: Record<string, any>;
       recordException?: boolean;
-    }
+    },
   ): Promise<T> {
     const span = this.startSpan(name, { attributes: options?.attributes });
 
@@ -140,7 +140,7 @@ export class TelemetryService {
     options?: {
       attributes?: Record<string, any>;
       recordException?: boolean;
-    }
+    },
   ): T {
     const span = this.startSpan(name, { attributes: options?.attributes });
 
@@ -180,26 +180,18 @@ export class TelemetryService {
 
   // Create a decorator for method tracing
   static trace(name?: string) {
-    return function (
-      target: any,
-      propertyKey: string,
-      descriptor: PropertyDescriptor
-    ) {
+    return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
       const originalMethod = descriptor.value;
       const spanName = name || `${target.constructor.name}.${propertyKey}`;
 
       descriptor.value = async function (...args: any[]) {
         const telemetry = TelemetryService.getInstance();
-        return telemetry.traceAsync(
-          spanName,
-          async () => originalMethod.apply(this, args),
-          {
-            attributes: {
-              'method.name': propertyKey,
-              'method.args.count': args.length,
-            },
-          }
-        );
+        return telemetry.traceAsync(spanName, async () => originalMethod.apply(this, args), {
+          attributes: {
+            'method.name': propertyKey,
+            'method.args.count': args.length,
+          },
+        });
       };
 
       return descriptor;
@@ -211,4 +203,4 @@ export class TelemetryService {
 export const telemetry = TelemetryService.getInstance();
 
 // Export decorator
-export const trace = TelemetryService.trace; 
+export const trace = TelemetryService.trace;

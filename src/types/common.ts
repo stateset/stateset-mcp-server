@@ -101,4 +101,4 @@ export interface ListResponse<T = unknown> {
   page: number;
   per_page: number;
   metadata?: ResponseMetadata;
-} 
+}

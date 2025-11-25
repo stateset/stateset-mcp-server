@@ -45,7 +45,7 @@ export class StateSetApiError extends Error {
     message: string,
     public statusCode?: number,
     public response?: any,
-    public requestId?: string
+    public requestId?: string,
   ) {
     super(message);
     this.name = 'StateSetApiError';
@@ -77,13 +77,13 @@ export class StateSetClient {
   constructor(appConfig: Config = defaultConfig) {
     this.config = appConfig;
     this.baseUrl = this.normalizeBaseUrl(appConfig.api.baseUrl);
-    
+
     // Create axios instance with interceptors
     this.apiClient = axios.create({
       baseURL: this.baseUrl,
       timeout: this.config.api.timeout,
       headers: {
-        'Authorization': `Bearer ${this.config.api.key}`,
+        Authorization: `Bearer ${this.config.api.key}`,
         'Content-Type': 'application/json',
         'X-API-Version': this.config.api.version,
         'User-Agent': `${this.config.server.name}/${this.config.server.version}`,
@@ -96,19 +96,19 @@ export class StateSetClient {
         const requestId = this.generateRequestId();
         request.headers['X-Request-ID'] = requestId;
         (request as ExtendedAxiosRequestConfig).metadata = { startTime: Date.now(), requestId };
-        
+
         logger.logApiRequest(
           request.method?.toUpperCase() || 'GET',
           request.url || '',
-          request.params
+          request.params,
         );
-        
+
         return request;
       },
       (error) => {
         logger.error('Request interceptor error', error);
         return Promise.reject(error);
-      }
+      },
     );
 
     // Response interceptor
@@ -117,21 +117,21 @@ export class StateSetClient {
         const extendedConfig = response.config as ExtendedAxiosRequestConfig;
         const duration = Date.now() - (extendedConfig.metadata?.startTime || Date.now());
         const requestId = extendedConfig.metadata?.requestId;
-        
+
         logger.logApiResponse(
           response.config.method?.toUpperCase() || 'GET',
           response.config.url || '',
           response.status,
-          duration
+          duration,
         );
-        
+
         recordApiCall(
           response.config.method?.toUpperCase() || 'GET',
           response.config.url || '',
           response.status,
-          duration
+          duration,
         );
-        
+
         // Add metadata to response
         if (response.data && typeof response.data === 'object') {
           response.data._metadata = {
@@ -140,35 +140,35 @@ export class StateSetClient {
             timestamp: Date.now(),
           };
         }
-        
+
         return response;
       },
       (error: AxiosError) => {
         const extendedConfig = error.config as ExtendedAxiosRequestConfig | undefined;
         const duration = Date.now() - (extendedConfig?.metadata?.startTime || Date.now());
         const requestId = extendedConfig?.metadata?.requestId;
-        
+
         logger.logApiError(
           error.config?.method?.toUpperCase() || 'GET',
           error.config?.url || '',
           error,
-          duration
+          duration,
         );
-        
+
         recordApiCall(
           error.config?.method?.toUpperCase() || 'GET',
           error.config?.url || '',
           error.response?.status || 0,
-          duration
+          duration,
         );
-        
+
         throw new StateSetApiError(
           error.message,
           error.response?.status,
           error.response?.data,
-          requestId
+          requestId,
         );
-      }
+      },
     );
 
     // Warm up caches
@@ -187,10 +187,13 @@ export class StateSetClient {
     method: string,
     endpoint: string,
     data?: any,
-    context: RequestContext = { requestId: this.generateRequestId(), operation: 'unknown' }
+    context: RequestContext = { requestId: this.generateRequestId(), operation: 'unknown' },
   ): Promise<EnrichedResponse<T>> {
     const cacheKey = this.getCacheKey(method, endpoint, data);
-    const requestLogger = logger.child({ requestId: context.requestId, operation: context.operation });
+    const requestLogger = logger.child({
+      requestId: context.requestId,
+      operation: context.operation,
+    });
 
     // Try cache first for GET requests
     if (method === 'GET' && !context.skipCache) {
@@ -270,7 +273,7 @@ export class StateSetClient {
             error: error instanceof Error ? error.message : 'Unknown error',
           });
 
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
           return executeWithRetry(retryCount + 1);
         }
 
@@ -284,26 +287,19 @@ export class StateSetClient {
     };
 
     // Apply rate limiting
-    const rateLimitedRequest = () => rateLimiter.execute(
-      executeRequest,
-      context.operation,
-      context.priority
-    );
+    const rateLimitedRequest = () =>
+      rateLimiter.execute(executeRequest, context.operation, context.priority);
 
     // Create the request promise
-    const requestPromise = circuitBreakerManager.execute(
-      `api.${endpoint}`,
-      rateLimitedRequest,
-      {
-        errorFilter: (error) => {
-          // Don't trip circuit breaker for client errors
-          if (error instanceof StateSetApiError) {
-            return !error.statusCode || error.statusCode >= 500;
-          }
-          return true;
-        },
-      }
-    );
+    const requestPromise = circuitBreakerManager.execute(`api.${endpoint}`, rateLimitedRequest, {
+      errorFilter: (error) => {
+        // Don't trip circuit breaker for client errors
+        if (error instanceof StateSetApiError) {
+          return !error.statusCode || error.statusCode >= 500;
+        }
+        return true;
+      },
+    });
 
     // Store pending GET requests for deduplication
     if (method === 'GET') {
@@ -377,7 +373,7 @@ export class StateSetClient {
     // Register cache warming functions
     cacheManager.registerWarmup('api-responses', async () => {
       logger.info('Warming API response cache');
-      
+
       // Warm up common endpoints
       try {
         await this.listOrders({ page: 1, per_page: 10 });
@@ -394,76 +390,71 @@ export class StateSetClient {
   async createOrder(args: any): Promise<StateSetResponse> {
     // Apply caching and circuit breaker manually
     const cacheKey = `createOrder:${JSON.stringify(args)}`;
-    
+
     const executeCreate = async () => {
-      const response = await this.request<StateSetResponse>(
-        'POST',
-        '/orders',
-        args,
-        { requestId: this.generateRequestId(), operation: 'createOrder', priority: Priority.HIGH }
-      );
-      
+      const response = await this.request<StateSetResponse>('POST', '/orders', args, {
+        requestId: this.generateRequestId(),
+        operation: 'createOrder',
+        priority: Priority.HIGH,
+      });
+
       const result = {
         ...response.data,
         url: `${this.baseUrl}/dashboard/orders/${response.data.id}`,
       };
-      
+
       // Cache the result
       await cacheManager.set('orders', cacheKey, result, 300000);
-      
+
       return result;
     };
-    
+
     // Check cache first
     const cached = await cacheManager.get<StateSetResponse>('orders', cacheKey);
     if (cached) return cached;
-    
+
     // Execute with circuit breaker
     return circuitBreakerManager.execute('orders.create', executeCreate);
   }
 
   async updateOrder(args: any): Promise<StateSetResponse> {
     const { order_id, ...data } = args;
-    const response = await this.request<StateSetResponse>(
-      'PATCH',
-      `/orders/${order_id}`,
-      data,
-      { requestId: this.generateRequestId(), operation: 'updateOrder', priority: Priority.NORMAL }
-    );
-    
+    const response = await this.request<StateSetResponse>('PATCH', `/orders/${order_id}`, data, {
+      requestId: this.generateRequestId(),
+      operation: 'updateOrder',
+      priority: Priority.NORMAL,
+    });
+
     return response.data;
   }
 
   async getOrder(orderId: string): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'GET',
-      `/orders/${orderId}`,
-      undefined,
-      { requestId: this.generateRequestId(), operation: 'getOrder', priority: Priority.NORMAL }
-    );
-    
+    const response = await this.request<StateSetResponse>('GET', `/orders/${orderId}`, undefined, {
+      requestId: this.generateRequestId(),
+      operation: 'getOrder',
+      priority: Priority.NORMAL,
+    });
+
     return response.data;
   }
 
   async listOrders(args: { page?: number; per_page?: number } = {}): Promise<StateSetResponse[]> {
-    const response = await this.request<StateSetResponse[]>(
-      'GET',
-      '/orders',
-      args,
-      { requestId: this.generateRequestId(), operation: 'listOrders', priority: Priority.LOW }
-    );
-    
+    const response = await this.request<StateSetResponse[]>('GET', '/orders', args, {
+      requestId: this.generateRequestId(),
+      operation: 'listOrders',
+      priority: Priority.LOW,
+    });
+
     return response.data;
   }
 
   async createRMA(args: any): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'POST',
-      '/returns',
-      args,
-      { requestId: this.generateRequestId(), operation: 'createRMA', priority: Priority.HIGH }
-    );
-    
+    const response = await this.request<StateSetResponse>('POST', '/returns', args, {
+      requestId: this.generateRequestId(),
+      operation: 'createRMA',
+      priority: Priority.HIGH,
+    });
+
     return {
       ...response.data,
       url: `${this.baseUrl}/returns/${response.data.id}`,
@@ -473,29 +464,27 @@ export class StateSetClient {
   async updateRMA(): Promise<never> {
     throw new StateSetApiError(
       'Updating returns is not supported. Use stateset_approve_return or stateset_restock_return instead.',
-      405
+      405,
     );
   }
 
   async getRMA(rmaId: string): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'GET',
-      `/returns/${rmaId}`,
-      undefined,
-      { requestId: this.generateRequestId(), operation: 'getRMA', priority: Priority.NORMAL }
-    );
-    
+    const response = await this.request<StateSetResponse>('GET', `/returns/${rmaId}`, undefined, {
+      requestId: this.generateRequestId(),
+      operation: 'getRMA',
+      priority: Priority.NORMAL,
+    });
+
     return response.data;
   }
 
   async listRMAs(args: { page?: number; per_page?: number } = {}): Promise<StateSetResponse[]> {
-    const response = await this.request<StateSetResponse[]>(
-      'GET',
-      '/returns',
-      args,
-      { requestId: this.generateRequestId(), operation: 'listRMAs', priority: Priority.LOW }
-    );
-    
+    const response = await this.request<StateSetResponse[]>('GET', '/returns', args, {
+      requestId: this.generateRequestId(),
+      operation: 'listRMAs',
+      priority: Priority.LOW,
+    });
+
     return response.data;
   }
 
@@ -504,29 +493,31 @@ export class StateSetClient {
       'POST',
       `/returns/${returnId}/approve`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'approveReturn', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'approveReturn',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
 
   async restockReturn(returnId: string): Promise<any> {
-    const response = await this.request<any>(
-      'POST',
-      `/returns/${returnId}/restock`,
-      undefined,
-      { requestId: this.generateRequestId(), operation: 'restockReturn', priority: Priority.NORMAL }
-    );
+    const response = await this.request<any>('POST', `/returns/${returnId}/restock`, undefined, {
+      requestId: this.generateRequestId(),
+      operation: 'restockReturn',
+      priority: Priority.NORMAL,
+    });
     return response.data;
   }
 
   async createProduct(args: any): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'POST',
-      '/products',
-      args,
-      { requestId: this.generateRequestId(), operation: 'createProduct', priority: Priority.NORMAL }
-    );
-    
+    const response = await this.request<StateSetResponse>('POST', '/products', args, {
+      requestId: this.generateRequestId(),
+      operation: 'createProduct',
+      priority: Priority.NORMAL,
+    });
+
     return response.data;
   }
 
@@ -536,9 +527,13 @@ export class StateSetClient {
       'PATCH',
       `/products/${product_id}`,
       data,
-      { requestId: this.generateRequestId(), operation: 'updateProduct', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'updateProduct',
+        priority: Priority.NORMAL,
+      },
     );
-    
+
     return response.data;
   }
 
@@ -547,20 +542,19 @@ export class StateSetClient {
       'GET',
       `/products/${productId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'getProduct', priority: Priority.NORMAL }
+      { requestId: this.generateRequestId(), operation: 'getProduct', priority: Priority.NORMAL },
     );
-    
+
     return response.data;
   }
 
   async listProducts(args: { page?: number; per_page?: number } = {}): Promise<StateSetResponse[]> {
-    const response = await this.request<StateSetResponse[]>(
-      'GET',
-      '/products',
-      args,
-      { requestId: this.generateRequestId(), operation: 'listProducts', priority: Priority.LOW }
-    );
-    
+    const response = await this.request<StateSetResponse[]>('GET', '/products', args, {
+      requestId: this.generateRequestId(),
+      operation: 'listProducts',
+      priority: Priority.LOW,
+    });
+
     return response.data;
   }
 
@@ -568,52 +562,49 @@ export class StateSetClient {
   async batchCreate<T>(
     resource: string,
     items: T[],
-    options: { batchSize?: number; concurrency?: number } = {}
+    options: { batchSize?: number; concurrency?: number } = {},
   ): Promise<StateSetResponse[]> {
     const { batchSize = 10, concurrency = 3 } = options;
     const results: StateSetResponse[] = [];
-    
+
     logger.info('Starting batch create operation', {
       resource,
       totalItems: items.length,
       batchSize,
       concurrency,
     });
-    
+
     // Process in batches
     for (let i = 0; i < items.length; i += batchSize) {
       const batch = items.slice(i, i + batchSize);
       const batchPromises = batch.map((item, index) =>
-        this.request<StateSetResponse>(
-          'POST',
-          `/${resource}`,
-          item,
-          {
-            requestId: this.generateRequestId(),
-            operation: `batchCreate${resource}`,
-            priority: Priority.NORMAL,
-          }
-        ).then(r => r.data).catch(error => {
-          logger.error('Batch item failed', error, { index: i + index });
-          return null;
+        this.request<StateSetResponse>('POST', `/${resource}`, item, {
+          requestId: this.generateRequestId(),
+          operation: `batchCreate${resource}`,
+          priority: Priority.NORMAL,
         })
+          .then((r) => r.data)
+          .catch((error) => {
+            logger.error('Batch item failed', error, { index: i + index });
+            return null;
+          }),
       );
-      
+
       const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults.filter(r => r !== null) as StateSetResponse[]);
-      
+      results.push(...(batchResults.filter((r) => r !== null) as StateSetResponse[]));
+
       // Add delay between batches to avoid overwhelming the API
       if (i + batchSize < items.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
-    
+
     logger.info('Batch create operation completed', {
       resource,
       successCount: results.length,
       failureCount: items.length - results.length,
     });
-    
+
     return results;
   }
 
@@ -628,9 +619,9 @@ export class StateSetClient {
         operation: 'healthCheck',
         priority: Priority.CRITICAL,
         skipCache: true,
-      }
+      },
     );
-    
+
     return response.data;
   }
 
@@ -655,7 +646,7 @@ export class StateSetClient {
       'DELETE',
       `/orders/${orderId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'deleteOrder', priority: Priority.NORMAL }
+      { requestId: this.generateRequestId(), operation: 'deleteOrder', priority: Priority.NORMAL },
     );
     return response.data;
   }
@@ -665,19 +656,22 @@ export class StateSetClient {
       'DELETE',
       `/products/${productId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'deleteProduct', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'deleteProduct',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
 
   // Customer methods
   async createCustomer(args: any): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'POST',
-      '/customers',
-      args,
-      { requestId: this.generateRequestId(), operation: 'createCustomer', priority: Priority.NORMAL }
-    );
+    const response = await this.request<StateSetResponse>('POST', '/customers', args, {
+      requestId: this.generateRequestId(),
+      operation: 'createCustomer',
+      priority: Priority.NORMAL,
+    });
     return response.data;
   }
 
@@ -687,7 +681,11 @@ export class StateSetClient {
       'PATCH',
       `/customers/${customer_id}`,
       data,
-      { requestId: this.generateRequestId(), operation: 'updateCustomer', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'updateCustomer',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -697,7 +695,11 @@ export class StateSetClient {
       'DELETE',
       `/customers/${customerId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'deleteCustomer', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'deleteCustomer',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -707,29 +709,29 @@ export class StateSetClient {
       'GET',
       `/customers/${customerId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'getCustomer', priority: Priority.NORMAL }
+      { requestId: this.generateRequestId(), operation: 'getCustomer', priority: Priority.NORMAL },
     );
     return response.data;
   }
 
-  async listCustomers(args: { page?: number; per_page?: number } = {}): Promise<StateSetResponse[]> {
-    const response = await this.request<StateSetResponse[]>(
-      'GET',
-      '/customers',
-      args,
-      { requestId: this.generateRequestId(), operation: 'listCustomers', priority: Priority.LOW }
-    );
+  async listCustomers(
+    args: { page?: number; per_page?: number } = {},
+  ): Promise<StateSetResponse[]> {
+    const response = await this.request<StateSetResponse[]>('GET', '/customers', args, {
+      requestId: this.generateRequestId(),
+      operation: 'listCustomers',
+      priority: Priority.LOW,
+    });
     return response.data;
   }
 
   // Inventory methods
   async createInventory(args: any): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'POST',
-      '/inventory',
-      args,
-      { requestId: this.generateRequestId(), operation: 'createInventory', priority: Priority.NORMAL }
-    );
+    const response = await this.request<StateSetResponse>('POST', '/inventory', args, {
+      requestId: this.generateRequestId(),
+      operation: 'createInventory',
+      priority: Priority.NORMAL,
+    });
     return response.data;
   }
 
@@ -739,7 +741,11 @@ export class StateSetClient {
       'PATCH',
       `/inventory/${inventory_id}`,
       data,
-      { requestId: this.generateRequestId(), operation: 'updateInventory', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'updateInventory',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -749,7 +755,11 @@ export class StateSetClient {
       'DELETE',
       `/inventory/${inventoryId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'deleteInventory', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'deleteInventory',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -759,29 +769,29 @@ export class StateSetClient {
       'GET',
       `/inventory/${inventoryId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'getInventory', priority: Priority.NORMAL }
+      { requestId: this.generateRequestId(), operation: 'getInventory', priority: Priority.NORMAL },
     );
     return response.data;
   }
 
-  async listInventories(args: { page?: number; per_page?: number } = {}): Promise<StateSetResponse[]> {
-    const response = await this.request<StateSetResponse[]>(
-      'GET',
-      '/inventory',
-      args,
-      { requestId: this.generateRequestId(), operation: 'listInventories', priority: Priority.LOW }
-    );
+  async listInventories(
+    args: { page?: number; per_page?: number } = {},
+  ): Promise<StateSetResponse[]> {
+    const response = await this.request<StateSetResponse[]>('GET', '/inventory', args, {
+      requestId: this.generateRequestId(),
+      operation: 'listInventories',
+      priority: Priority.LOW,
+    });
     return response.data;
   }
 
   // Warranty methods
   async createWarranty(args: any): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'POST',
-      '/warranties',
-      args,
-      { requestId: this.generateRequestId(), operation: 'createWarranty', priority: Priority.NORMAL }
-    );
+    const response = await this.request<StateSetResponse>('POST', '/warranties', args, {
+      requestId: this.generateRequestId(),
+      operation: 'createWarranty',
+      priority: Priority.NORMAL,
+    });
     return response.data;
   }
 
@@ -791,7 +801,11 @@ export class StateSetClient {
       'PATCH',
       `/warranties/${warranty_id}`,
       data,
-      { requestId: this.generateRequestId(), operation: 'updateWarranty', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'updateWarranty',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -801,7 +815,11 @@ export class StateSetClient {
       'DELETE',
       `/warranties/${warrantyId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'deleteWarranty', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'deleteWarranty',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -811,34 +829,37 @@ export class StateSetClient {
       'GET',
       `/warranties/${warrantyId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'getWarranty', priority: Priority.NORMAL }
+      { requestId: this.generateRequestId(), operation: 'getWarranty', priority: Priority.NORMAL },
     );
     return response.data;
   }
 
-  async listWarranties(args: { page?: number; per_page?: number } = {}): Promise<StateSetResponse[]> {
-    const response = await this.request<StateSetResponse[]>(
-      'GET',
-      '/warranties',
-      args,
-      { requestId: this.generateRequestId(), operation: 'listWarranties', priority: Priority.LOW }
-    );
+  async listWarranties(
+    args: { page?: number; per_page?: number } = {},
+  ): Promise<StateSetResponse[]> {
+    const response = await this.request<StateSetResponse[]>('GET', '/warranties', args, {
+      requestId: this.generateRequestId(),
+      operation: 'listWarranties',
+      priority: Priority.LOW,
+    });
     return response.data;
   }
 
   // Shipment methods
   async createShipment(args: any): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'POST',
-      '/shipments',
-      args,
-      { requestId: this.generateRequestId(), operation: 'createShipment', priority: Priority.HIGH }
-    );
+    const response = await this.request<StateSetResponse>('POST', '/shipments', args, {
+      requestId: this.generateRequestId(),
+      operation: 'createShipment',
+      priority: Priority.HIGH,
+    });
     return response.data;
   }
 
   async updateShipment(): Promise<never> {
-    throw new StateSetApiError('Updating shipments is not supported. Use mark shipment operations instead.', 405);
+    throw new StateSetApiError(
+      'Updating shipments is not supported. Use mark shipment operations instead.',
+      405,
+    );
   }
 
   async deleteShipment(): Promise<never> {
@@ -850,7 +871,11 @@ export class StateSetClient {
       'POST',
       `/shipments/${shipmentId}/ship`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'markShipmentShipped', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'markShipmentShipped',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -860,7 +885,11 @@ export class StateSetClient {
       'POST',
       `/shipments/${shipmentId}/deliver`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'markShipmentDelivered', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'markShipmentDelivered',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -870,29 +899,29 @@ export class StateSetClient {
       'GET',
       `/shipments/${shipmentId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'getShipment', priority: Priority.NORMAL }
+      { requestId: this.generateRequestId(), operation: 'getShipment', priority: Priority.NORMAL },
     );
     return response.data;
   }
 
-  async listShipments(args: { page?: number; per_page?: number } = {}): Promise<StateSetResponse[]> {
-    const response = await this.request<StateSetResponse[]>(
-      'GET',
-      '/shipments',
-      args,
-      { requestId: this.generateRequestId(), operation: 'listShipments', priority: Priority.LOW }
-    );
+  async listShipments(
+    args: { page?: number; per_page?: number } = {},
+  ): Promise<StateSetResponse[]> {
+    const response = await this.request<StateSetResponse[]>('GET', '/shipments', args, {
+      requestId: this.generateRequestId(),
+      operation: 'listShipments',
+      priority: Priority.LOW,
+    });
     return response.data;
   }
 
   // Sales Order methods
   async createSalesOrder(args: any): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'POST',
-      '/sales-orders',
-      args,
-      { requestId: this.generateRequestId(), operation: 'createSalesOrder', priority: Priority.HIGH }
-    );
+    const response = await this.request<StateSetResponse>('POST', '/sales-orders', args, {
+      requestId: this.generateRequestId(),
+      operation: 'createSalesOrder',
+      priority: Priority.HIGH,
+    });
     return response.data;
   }
 
@@ -902,7 +931,11 @@ export class StateSetClient {
       'PATCH',
       `/sales-orders/${sales_order_id}`,
       data,
-      { requestId: this.generateRequestId(), operation: 'updateSalesOrder', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'updateSalesOrder',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -912,7 +945,11 @@ export class StateSetClient {
       'DELETE',
       `/sales-orders/${salesOrderId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'deleteSalesOrder', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'deleteSalesOrder',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -922,29 +959,33 @@ export class StateSetClient {
       'GET',
       `/sales-orders/${salesOrderId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'getSalesOrder', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'getSalesOrder',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
 
-  async listSalesOrders(args: { page?: number; per_page?: number } = {}): Promise<StateSetResponse[]> {
-    const response = await this.request<StateSetResponse[]>(
-      'GET',
-      '/sales-orders',
-      args,
-      { requestId: this.generateRequestId(), operation: 'listSalesOrders', priority: Priority.LOW }
-    );
+  async listSalesOrders(
+    args: { page?: number; per_page?: number } = {},
+  ): Promise<StateSetResponse[]> {
+    const response = await this.request<StateSetResponse[]>('GET', '/sales-orders', args, {
+      requestId: this.generateRequestId(),
+      operation: 'listSalesOrders',
+      priority: Priority.LOW,
+    });
     return response.data;
   }
 
   // Purchase Order methods
   async createPurchaseOrder(args: any): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'POST',
-      '/purchase-orders',
-      args,
-      { requestId: this.generateRequestId(), operation: 'createPurchaseOrder', priority: Priority.HIGH }
-    );
+    const response = await this.request<StateSetResponse>('POST', '/purchase-orders', args, {
+      requestId: this.generateRequestId(),
+      operation: 'createPurchaseOrder',
+      priority: Priority.HIGH,
+    });
     return response.data;
   }
 
@@ -954,7 +995,11 @@ export class StateSetClient {
       'PATCH',
       `/purchase-orders/${purchase_order_id}`,
       data,
-      { requestId: this.generateRequestId(), operation: 'updatePurchaseOrder', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'updatePurchaseOrder',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -964,7 +1009,11 @@ export class StateSetClient {
       'DELETE',
       `/purchase-orders/${purchaseOrderId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'deletePurchaseOrder', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'deletePurchaseOrder',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -974,29 +1023,33 @@ export class StateSetClient {
       'GET',
       `/purchase-orders/${purchaseOrderId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'getPurchaseOrder', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'getPurchaseOrder',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
 
-  async listPurchaseOrders(args: { page?: number; per_page?: number } = {}): Promise<StateSetResponse[]> {
-    const response = await this.request<StateSetResponse[]>(
-      'GET',
-      '/purchase-orders',
-      args,
-      { requestId: this.generateRequestId(), operation: 'listPurchaseOrders', priority: Priority.LOW }
-    );
+  async listPurchaseOrders(
+    args: { page?: number; per_page?: number } = {},
+  ): Promise<StateSetResponse[]> {
+    const response = await this.request<StateSetResponse[]>('GET', '/purchase-orders', args, {
+      requestId: this.generateRequestId(),
+      operation: 'listPurchaseOrders',
+      priority: Priority.LOW,
+    });
     return response.data;
   }
 
   // Invoice methods
   async createInvoice(args: any): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'POST',
-      '/invoices',
-      args,
-      { requestId: this.generateRequestId(), operation: 'createInvoice', priority: Priority.NORMAL }
-    );
+    const response = await this.request<StateSetResponse>('POST', '/invoices', args, {
+      requestId: this.generateRequestId(),
+      operation: 'createInvoice',
+      priority: Priority.NORMAL,
+    });
     return response.data;
   }
 
@@ -1006,7 +1059,11 @@ export class StateSetClient {
       'PATCH',
       `/invoices/${invoice_id}`,
       data,
-      { requestId: this.generateRequestId(), operation: 'updateInvoice', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'updateInvoice',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -1016,7 +1073,11 @@ export class StateSetClient {
       'DELETE',
       `/invoices/${invoiceId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'deleteInvoice', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'deleteInvoice',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -1026,29 +1087,27 @@ export class StateSetClient {
       'GET',
       `/invoices/${invoiceId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'getInvoice', priority: Priority.NORMAL }
+      { requestId: this.generateRequestId(), operation: 'getInvoice', priority: Priority.NORMAL },
     );
     return response.data;
   }
 
   async listInvoices(args: { page?: number; per_page?: number } = {}): Promise<StateSetResponse[]> {
-    const response = await this.request<StateSetResponse[]>(
-      'GET',
-      '/invoices',
-      args,
-      { requestId: this.generateRequestId(), operation: 'listInvoices', priority: Priority.LOW }
-    );
+    const response = await this.request<StateSetResponse[]>('GET', '/invoices', args, {
+      requestId: this.generateRequestId(),
+      operation: 'listInvoices',
+      priority: Priority.LOW,
+    });
     return response.data;
   }
 
   // Payment methods
   async createPayment(args: any): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'POST',
-      '/payments',
-      args,
-      { requestId: this.generateRequestId(), operation: 'createPayment', priority: Priority.HIGH }
-    );
+    const response = await this.request<StateSetResponse>('POST', '/payments', args, {
+      requestId: this.generateRequestId(),
+      operation: 'createPayment',
+      priority: Priority.HIGH,
+    });
     return response.data;
   }
 
@@ -1058,7 +1117,11 @@ export class StateSetClient {
       'PATCH',
       `/payments/${payment_id}`,
       data,
-      { requestId: this.generateRequestId(), operation: 'updatePayment', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'updatePayment',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -1068,7 +1131,11 @@ export class StateSetClient {
       'DELETE',
       `/payments/${paymentId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'deletePayment', priority: Priority.NORMAL }
+      {
+        requestId: this.generateRequestId(),
+        operation: 'deletePayment',
+        priority: Priority.NORMAL,
+      },
     );
     return response.data;
   }
@@ -1078,18 +1145,17 @@ export class StateSetClient {
       'GET',
       `/payments/${paymentId}`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'getPayment', priority: Priority.NORMAL }
+      { requestId: this.generateRequestId(), operation: 'getPayment', priority: Priority.NORMAL },
     );
     return response.data;
   }
 
   async listPayments(args: { page?: number; per_page?: number } = {}): Promise<StateSetResponse[]> {
-    const response = await this.request<StateSetResponse[]>(
-      'GET',
-      '/payments',
-      args,
-      { requestId: this.generateRequestId(), operation: 'listPayments', priority: Priority.LOW }
-    );
+    const response = await this.request<StateSetResponse[]>('GET', '/payments', args, {
+      requestId: this.generateRequestId(),
+      operation: 'listPayments',
+      priority: Priority.LOW,
+    });
     return response.data;
   }
 }
@@ -1098,4 +1164,4 @@ export class StateSetClient {
 export const statesetClient = new StateSetClient();
 
 // Export types
-export type { StateSetResponse, EnrichedResponse }; 
+export type { StateSetResponse, EnrichedResponse };

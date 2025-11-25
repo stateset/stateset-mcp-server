@@ -56,4 +56,4 @@ export interface ToolRegistryEntry {
   handler: (args: unknown, context: ToolContext) => Promise<unknown>;
   validator?: (args: unknown) => boolean;
   middleware?: Array<(args: unknown, context: ToolContext) => Promise<void>>;
-} 
+}

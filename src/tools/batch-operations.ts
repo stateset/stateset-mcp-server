@@ -26,11 +26,13 @@ const logger = createLogger('batch-operations');
 // Batch operation schemas - defined for documentation/reference
 export const BatchOrderSchema = z.object({
   customer_email: z.string().email(),
-  items: z.array(z.object({
-    item_id: z.string(),
-    quantity: z.number().positive(),
-    price: z.number().positive(),
-  })),
+  items: z.array(
+    z.object({
+      item_id: z.string(),
+      quantity: z.number().positive(),
+      price: z.number().positive(),
+    }),
+  ),
   shipping_address: z.object({
     line1: z.string(),
     city: z.string(),
@@ -41,16 +43,20 @@ export const BatchOrderSchema = z.object({
 });
 
 export const BatchOperationSchema = z.object({
-  operations: z.array(z.object({
-    type: z.enum(['create', 'update', 'delete']),
-    resource: z.enum(['order', 'rma', 'product', 'inventory', 'customer']),
-    data: z.any(),
-  })),
-  options: z.object({
-    parallel: z.boolean().default(false),
-    stopOnError: z.boolean().default(false),
-    chunkSize: z.number().positive().default(10),
-  }).optional(),
+  operations: z.array(
+    z.object({
+      type: z.enum(['create', 'update', 'delete']),
+      resource: z.enum(['order', 'rma', 'product', 'inventory', 'customer']),
+      data: z.any(),
+    }),
+  ),
+  options: z
+    .object({
+      parallel: z.boolean().default(false),
+      stopOnError: z.boolean().default(false),
+      chunkSize: z.number().positive().default(10),
+    })
+    .optional(),
 });
 
 export interface BatchResult {
@@ -75,7 +81,7 @@ export async function executeBatchOperations(
     parallel?: boolean;
     stopOnError?: boolean;
     chunkSize?: number;
-  } = {}
+  } = {},
 ): Promise<BatchResult> {
   const startTime = Date.now();
   const results: BatchResult['results'] = [];
@@ -95,21 +101,21 @@ export async function executeBatchOperations(
             const result = await executeOperation(client, op);
             results[index] = { index, success: true, data: result };
             success++;
-            
+
             // Broadcast progress
             wsManager.broadcast('batch-progress', {
               total: operations.length,
-              completed: results.filter(r => r !== undefined).length,
+              completed: results.filter((r) => r !== undefined).length,
               success,
               failed,
             });
-            
+
             return result;
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             results[index] = { index, success: false, error: errorMessage };
             failed++;
-            
+
             if (stopOnError) {
               throw error;
             }
@@ -129,7 +135,7 @@ export async function executeBatchOperations(
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           results[i] = { index: i, success: false, error: errorMessage };
           failed++;
-          
+
           if (stopOnError) {
             break;
           }
@@ -198,7 +204,9 @@ async function executeOperation(client: BatchClient, operation: any): Promise<an
           return client.createRMA(data);
         case 'update':
           // RMA update is not supported - use approve/restock instead
-          throw new Error('RMA update is not supported. Use approve_return or restock_return instead.');
+          throw new Error(
+            'RMA update is not supported. Use approve_return or restock_return instead.',
+          );
         case 'delete':
           // RMA deletion is not supported by the API
           throw new Error('RMA deletion is not supported');
@@ -445,4 +453,4 @@ export const batchTools = [
   batchCreateOrdersTool,
   batchUpdateInventoryTool,
   csvImportTool,
-]; 
+];

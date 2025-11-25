@@ -12,7 +12,7 @@ A world-class Model Context Protocol (MCP) server for StateSet API integration, 
 - **Comprehensive API Coverage**: Full support for StateSet's e-commerce operations
 - **Type-Safe**: Built with TypeScript for maximum type safety
 - **Production-Ready**: Includes health checks, metrics, and graceful shutdown
-- **Well-Tested**: Extensive test coverage with unit, integration, and E2E tests
+- **Well-Tested**: Comprehensive test suite with 136+ passing tests covering core functionality
 - **Observable**: Built-in logging, metrics, and request tracing
 - **Scalable**: Rate limiting, connection pooling, and efficient resource management
 - **Secure**: API key redaction, secure configuration, and input validation

@@ -101,4 +101,4 @@ export const enhancedTools: Tool[] = [
 ];
 
 // Export individual tool categories for selective import
-export { batchTools, searchTools, aiInsightsTools }; 
+export { batchTools, searchTools, aiInsightsTools };

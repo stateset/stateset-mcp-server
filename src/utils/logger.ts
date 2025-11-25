@@ -58,9 +58,7 @@ const devConfig: pino.LoggerOptions = {
 };
 
 // Create the base logger
-const baseLogger = config.server.environment === 'development' 
-  ? pino(devConfig)
-  : pino(baseConfig);
+const baseLogger = config.server.environment === 'development' ? pino(devConfig) : pino(baseConfig);
 
 // Logger context management
 interface LogContext {
@@ -121,15 +119,18 @@ class Logger {
 
   // Metric logging
   metric(name: string, value: number, tags?: Record<string, string>): void {
-    (this.logger as any).metric({
-      ...this.context,
-      metric: {
-        name,
-        value,
-        tags: { ...tags },
-        timestamp: new Date().toISOString(),
+    (this.logger as any).metric(
+      {
+        ...this.context,
+        metric: {
+          name,
+          value,
+          tags: { ...tags },
+          timestamp: new Date().toISOString(),
+        },
       },
-    }, `Metric: ${name}`);
+      `Metric: ${name}`,
+    );
   }
 
   // Performance timing
@@ -230,4 +231,4 @@ export function createRequestLogger(requestId: string, userId?: string): Logger 
 // Operation-scoped logger factory
 export function createOperationLogger(operation: string, context?: LogContext): Logger {
   return logger.child({ operation, ...context });
-} 
+}

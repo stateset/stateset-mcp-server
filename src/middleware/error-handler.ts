@@ -23,7 +23,7 @@ export class APIError extends Error {
     public statusCode: number = 500,
     public code: string = 'INTERNAL_ERROR',
     public context?: ErrorContext,
-    suggestions?: ActionableSuggestion[]
+    suggestions?: ActionableSuggestion[],
   ) {
     super(message);
     this.name = 'APIError';
@@ -32,7 +32,10 @@ export class APIError extends Error {
 }
 
 export class ValidationError extends APIError {
-  constructor(message: string, public validationErrors: ZodError) {
+  constructor(
+    message: string,
+    public validationErrors: ZodError,
+  ) {
     super(message, 400, 'VALIDATION_ERROR', undefined, [
       {
         action: 'Check input parameters',
@@ -100,7 +103,8 @@ export class AuthenticationError extends APIError {
       },
       {
         action: 'Check key expiration',
-        description: 'API keys may expire. Generate a new key from the StateSet dashboard if needed.',
+        description:
+          'API keys may expire. Generate a new key from the StateSet dashboard if needed.',
       },
       {
         action: 'Verify permissions',
@@ -113,55 +117,46 @@ export class AuthenticationError extends APIError {
 
 export class NotFoundError extends APIError {
   constructor(resourceType: string, resourceId: string) {
-    super(
-      `${resourceType} with ID '${resourceId}' not found`,
-      404,
-      'NOT_FOUND',
-      undefined,
-      [
-        {
-          action: 'Verify resource ID',
-          description: `Double-check the ${resourceType.toLowerCase()} ID is correct`,
-          example: `Use stateset_list_${resourceType.toLowerCase()}s to see available resources`,
-        },
-        {
-          action: 'Check resource existence',
-          description: 'The resource may have been deleted or never existed',
-        },
-      ]
-    );
+    super(`${resourceType} with ID '${resourceId}' not found`, 404, 'NOT_FOUND', undefined, [
+      {
+        action: 'Verify resource ID',
+        description: `Double-check the ${resourceType.toLowerCase()} ID is correct`,
+        example: `Use stateset_list_${resourceType.toLowerCase()}s to see available resources`,
+      },
+      {
+        action: 'Check resource existence',
+        description: 'The resource may have been deleted or never existed',
+      },
+    ]);
     this.name = 'NotFoundError';
   }
 }
 
 export class TimeoutError extends APIError {
   constructor(operation: string, timeoutMs: number) {
-    super(
-      `Operation '${operation}' timed out after ${timeoutMs}ms`,
-      504,
-      'TIMEOUT',
-      undefined,
-      [
-        {
-          action: 'Retry the operation',
-          description: 'The server may be temporarily slow. Try again in a few seconds.',
-        },
-        {
-          action: 'Simplify the request',
-          description: 'For batch operations, try smaller batch sizes',
-        },
-        {
-          action: 'Check server status',
-          description: 'Use stateset_health_check to verify the API is responsive',
-        },
-      ]
-    );
+    super(`Operation '${operation}' timed out after ${timeoutMs}ms`, 504, 'TIMEOUT', undefined, [
+      {
+        action: 'Retry the operation',
+        description: 'The server may be temporarily slow. Try again in a few seconds.',
+      },
+      {
+        action: 'Simplify the request',
+        description: 'For batch operations, try smaller batch sizes',
+      },
+      {
+        action: 'Check server status',
+        description: 'Use stateset_health_check to verify the API is responsive',
+      },
+    ]);
     this.name = 'TimeoutError';
   }
 }
 
 // Helper to get suggestions based on error type and status code
-function getSuggestionsForHttpError(statusCode: number, _operation?: string): ActionableSuggestion[] {
+function getSuggestionsForHttpError(
+  statusCode: number,
+  _operation?: string,
+): ActionableSuggestion[] {
   switch (statusCode) {
     case 400:
       return [
@@ -266,8 +261,8 @@ export function handleError(error: unknown, context?: ErrorContext): APIError {
 
   if (error instanceof ZodError) {
     return new ValidationError(
-      `Validation failed: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
-      error
+      `Validation failed: ${error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+      error,
     );
   }
 
@@ -293,27 +288,21 @@ export function handleError(error: unknown, context?: ErrorContext): APIError {
       statusCode,
       'EXTERNAL_API_ERROR',
       context,
-      suggestions
+      suggestions,
     );
   }
 
   // Unknown error
-  return new APIError(
-    'An unexpected error occurred',
-    500,
-    'INTERNAL_ERROR',
-    context,
-    [
-      {
-        action: 'Contact support',
-        description: 'If this error persists, please report it with the request ID',
-      },
-      {
-        action: 'Retry the operation',
-        description: 'This may be a transient error. Try again in a few seconds.',
-      },
-    ]
-  );
+  return new APIError('An unexpected error occurred', 500, 'INTERNAL_ERROR', context, [
+    {
+      action: 'Contact support',
+      description: 'If this error persists, please report it with the request ID',
+    },
+    {
+      action: 'Retry the operation',
+      description: 'This may be a transient error. Try again in a few seconds.',
+    },
+  ]);
 }
 
 export function sanitizeError(error: APIError): Record<string, unknown> {
@@ -323,7 +312,7 @@ export function sanitizeError(error: APIError): Record<string, unknown> {
     statusCode: error.statusCode,
     suggestions: error.suggestions,
     ...(error instanceof ValidationError && {
-      validationErrors: error.validationErrors.errors.map(e => ({
+      validationErrors: error.validationErrors.errors.map((e) => ({
         path: e.path.join('.'),
         message: e.message,
         code: e.code,

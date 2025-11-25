@@ -150,7 +150,8 @@ const openApiSpec = {
               'text/plain': {
                 schema: {
                   type: 'string',
-                  example: '# HELP api_requests_total Total number of API requests\n# TYPE api_requests_total counter\napi_requests_total{method="GET",status="200"} 1234',
+                  example:
+                    '# HELP api_requests_total Total number of API requests\n# TYPE api_requests_total counter\napi_requests_total{method="GET",status="200"} 1234',
                 },
               },
             },
@@ -384,7 +385,7 @@ export function createApiDocsRouter(): Router {
       customCss: '.swagger-ui .topbar { display: none }',
       customSiteTitle: 'StateSet MCP Server API Documentation',
       customfavIcon: '/favicon.ico',
-    })
+    }),
   );
 
   logger.info('API documentation available at /api-docs');
@@ -393,4 +394,4 @@ export function createApiDocsRouter(): Router {
 }
 
 // Export the OpenAPI spec for other uses
-export { openApiSpec }; 
+export { openApiSpec };
