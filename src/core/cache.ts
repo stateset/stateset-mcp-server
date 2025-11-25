@@ -155,7 +155,8 @@ class LRUCache<T> extends CacheStrategy<T> {
   evict(): void {
     if (this.accessOrder.length === 0) return;
 
-    const keyToEvict = this.accessOrder.shift()!;
+    const keyToEvict = this.accessOrder.shift();
+    if (!keyToEvict) return;
     this.delete(keyToEvict);
     this.stats.evictions++;
     logger.debug('LRU eviction', { key: keyToEvict });
@@ -209,7 +210,8 @@ class FIFOCache<T> extends CacheStrategy<T> {
   evict(): void {
     if (this.insertOrder.length === 0) return;
 
-    const keyToEvict = this.insertOrder.shift()!;
+    const keyToEvict = this.insertOrder.shift();
+    if (!keyToEvict) return;
     this.delete(keyToEvict);
     this.stats.evictions++;
     logger.debug('FIFO eviction', { key: keyToEvict });
@@ -266,7 +268,11 @@ export class CacheManager {
         maxSize: size,
       });
     }
-    return this.caches.get(namespace)!;
+    const cache = this.caches.get(namespace);
+    if (!cache) {
+      throw new Error(`Cache namespace ${namespace} not found`);
+    }
+    return cache;
   }
 
   // Cache operations with namespace

@@ -251,7 +251,8 @@ export class MetricsCollector extends EventEmitter {
       });
     }
 
-    this.histograms.get(key)!.observe(value);
+    const histogram = this.histograms.get(key);
+    if (histogram) histogram.observe(value);
   }
 
   // Summary operations
@@ -267,7 +268,8 @@ export class MetricsCollector extends EventEmitter {
       });
     }
 
-    this.summaries.get(key)!.observe(value);
+    const summary = this.summaries.get(key);
+    if (summary) summary.observe(value);
   }
 
   // Timer helper
@@ -288,7 +290,8 @@ export class MetricsCollector extends EventEmitter {
 
     // Collect counters
     for (const [key, value] of this.counters.entries()) {
-      const metadata = this.metricMetadata.get(key)!;
+      const metadata = this.metricMetadata.get(key);
+      if (!metadata) continue;
       const [name] = this.parseKey(key);
 
       metrics.push({
@@ -303,7 +306,8 @@ export class MetricsCollector extends EventEmitter {
 
     // Collect gauges
     for (const [key, value] of this.gauges.entries()) {
-      const metadata = this.metricMetadata.get(key)!;
+      const metadata = this.metricMetadata.get(key);
+      if (!metadata) continue;
       const [name] = this.parseKey(key);
 
       metrics.push({
@@ -318,7 +322,8 @@ export class MetricsCollector extends EventEmitter {
 
     // Collect histograms
     for (const [key, histogram] of this.histograms.entries()) {
-      const metadata = this.metricMetadata.get(key)!;
+      const metadata = this.metricMetadata.get(key);
+      if (!metadata) continue;
       const [name] = this.parseKey(key);
 
       metrics.push({
@@ -335,7 +340,8 @@ export class MetricsCollector extends EventEmitter {
 
     // Collect summaries
     for (const [key, summary] of this.summaries.entries()) {
-      const metadata = this.metricMetadata.get(key)!;
+      const metadata = this.metricMetadata.get(key);
+      if (!metadata) continue;
       const [name] = this.parseKey(key);
 
       metrics.push({

@@ -166,7 +166,8 @@ export class WebSocketManager extends EventEmitter {
     if (!this.channels.has(channel)) {
       this.channels.set(channel, new Set());
     }
-    this.channels.get(channel)!.add(subscriptionId);
+    const channelSet = this.channels.get(channel);
+    if (channelSet) channelSet.add(subscriptionId);
 
     // Send confirmation
     this.send(subscription.ws, {

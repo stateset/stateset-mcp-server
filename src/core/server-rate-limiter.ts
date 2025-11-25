@@ -199,7 +199,8 @@ export class ToolRateLimiter {
 
   // Refill tokens based on elapsed time
   private refillTokens(category: ToolCategory): void {
-    const bucket = this.buckets.get(category)!;
+    const bucket = this.buckets.get(category);
+    if (!bucket) return;
     const config = this.limits[category];
     const now = Date.now();
     const elapsedMs = now - bucket.lastRefill;
@@ -220,7 +221,10 @@ export class ToolRateLimiter {
     const category = this.categorize(toolName);
     this.refillTokens(category);
 
-    const bucket = this.buckets.get(category)!;
+    const bucket = this.buckets.get(category);
+    if (!bucket) {
+      return { allowed: false, waitTimeMs: 1000, category };
+    }
     const config = this.limits[category];
 
     // Check if we have tokens available
@@ -260,7 +264,10 @@ export class ToolRateLimiter {
   ): ToolRateLimitMetrics | Record<ToolCategory, ToolRateLimitMetrics> {
     if (category) {
       this.refillTokens(category);
-      const bucket = this.buckets.get(category)!;
+      const bucket = this.buckets.get(category);
+      if (!bucket) {
+        throw new Error(`No bucket found for category: ${category}`);
+      }
       const lastTimestamp = bucket.requestTimestamps[bucket.requestTimestamps.length - 1];
       return {
         category,

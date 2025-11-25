@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
+    "module": "ES2022",
     "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
@@ -38,10 +38,6 @@
     "coverage",
     "**/*.test.ts",
     "**/*.spec.ts",
-    "src/server-enhanced.ts",
-    "src/server-ultimate.ts",
-    "src/simple-server.ts",
-    "src/enhanced-server.ts",
     "src/middleware/security.ts",
     "src/middleware/api-docs.ts",
     "src/core/realtime-manager.ts",

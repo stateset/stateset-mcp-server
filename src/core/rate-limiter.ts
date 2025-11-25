@@ -300,7 +300,8 @@ export class RateLimiter {
     // Insert based on priority
     let inserted = false;
     for (let i = 0; i < this.queue.length; i++) {
-      if (request.priority > this.queue[i]!.priority) {
+      const queueItem = this.queue[i];
+      if (queueItem && request.priority > queueItem.priority) {
         this.queue.splice(i, 0, request);
         inserted = true;
         break;
@@ -325,7 +326,8 @@ export class RateLimiter {
     this.processing = true;
 
     while (this.queue.length > 0 && this.strategy.canProceed()) {
-      const request = this.queue.shift()!;
+      const request = this.queue.shift();
+      if (!request) break;
       const waitTime = Date.now() - request.timestamp;
       this.waitTimes.push(waitTime);
 

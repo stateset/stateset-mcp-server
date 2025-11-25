@@ -1,7 +1,7 @@
 # StateSet MCP Server
 
 [![CI/CD Pipeline](https://github.com/stateset/mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/stateset/mcp-server/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/stateset/mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/stateset/mcp-server)
+[![codecov](https://codecov.io/gh/stateset/mcp-server/branch/master/graph/badge.svg)](https://codecov.io/gh/stateset/mcp-server)
 [![npm version](https://badge.fury.io/js/stateset-mcp-server.svg)](https://badge.fury.io/js/stateset-mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 

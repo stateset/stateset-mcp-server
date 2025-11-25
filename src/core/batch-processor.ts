@@ -271,7 +271,8 @@ export class BatchProcessor<T, R> extends EventEmitter {
       const batchResults: BatchResult<R>[] = [];
 
       for (let i = 0; i < valid.length; i++) {
-        const operation = valid[i]!;
+        const operation = valid[i];
+        if (!operation) continue;
         const processingTime = Date.now() - operation.timestamp;
 
         if (i < results.length && results[i] !== undefined) {

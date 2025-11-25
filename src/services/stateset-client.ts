@@ -217,7 +217,8 @@ export class StateSetClient {
     // If an identical request is already in flight, return the same promise
     if (method === 'GET' && this.pendingRequests.has(cacheKey)) {
       requestLogger.debug('Request deduplicated, reusing pending request', { endpoint });
-      return this.pendingRequests.get(cacheKey)!;
+      const pending = this.pendingRequests.get(cacheKey);
+      if (pending) return pending;
     }
 
     // Execute request with retry logic

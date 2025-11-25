@@ -375,7 +375,11 @@ export class CircuitBreakerManager {
       breaker.on('half-open', (data) => this.handleBreakerHalfOpen(data));
     }
 
-    return this.breakers.get(name)!;
+    const breaker = this.breakers.get(name);
+    if (!breaker) {
+      throw new Error(`Circuit breaker ${name} not found`);
+    }
+    return breaker;
   }
 
   async execute<T>(
