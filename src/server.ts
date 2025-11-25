@@ -19,6 +19,8 @@ import { StateSetMCPClient } from './services/mcp-client';
 import { handleToolCall } from './tools/dispatcher';
 import { Config } from './types/mcp-api';
 
+import { resourceHandlers } from './core/resource-registry';
+
 // Main Function
 async function main(): Promise<void> {
   try {
@@ -76,209 +78,22 @@ async function main(): Promise<void> {
     server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const uri = new URL(request.params.uri);
       const path = uri.pathname.replace(/^\//, '');
+      const handler = resourceHandlers.get(uri.protocol);
 
-      switch (uri.protocol) {
-        case 'stateset-rma:':
-          const rma = await client.getRMA(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(rma, null, 2),
-              },
-            ],
-          };
-        case 'stateset-order:':
-          const order = await client.getOrder(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(order, null, 2),
-              },
-            ],
-          };
-        case 'stateset-warranty:':
-          const warranty = await client.getWarranty(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(warranty, null, 2),
-              },
-            ],
-          };
-        case 'stateset-shipment:':
-          const shipment = await client.getShipment(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(shipment, null, 2),
-              },
-            ],
-          };
-        case 'stateset-bill-of-materials:':
-          const bom = await client.getBillOfMaterials(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(bom, null, 2),
-              },
-            ],
-          };
-        case 'stateset-work-order:':
-          const wo = await client.getWorkOrder(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(wo, null, 2),
-              },
-            ],
-          };
-        case 'stateset-manufacturer-order:':
-          const mo = await client.getManufacturerOrder(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(mo, null, 2),
-              },
-            ],
-          };
-        case 'stateset-purchase-order:':
-          const po = await client.getPurchaseOrder(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(po, null, 2),
-              },
-            ],
-          };
-        case 'stateset-asn:':
-          const asn = await client.getASN(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(asn, null, 2),
-              },
-            ],
-          };
-        case 'stateset-invoice:':
-          const invoice = await client.getInvoice(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(invoice, null, 2),
-              },
-            ],
-          };
-        case 'stateset-payment:':
-          const payment = await client.getPayment(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(payment, null, 2),
-              },
-            ],
-          };
-        case 'stateset-sales-order:':
-          const salesOrder = await client.getSalesOrder(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(salesOrder, null, 2),
-              },
-            ],
-          };
-        case 'stateset-fulfillment-order:':
-          const fo = await client.getFulfillmentOrder(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(fo, null, 2),
-              },
-            ],
-          };
-        case 'stateset-item-receipt:':
-          const ir = await client.getItemReceipt(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(ir, null, 2),
-              },
-            ],
-          };
-        case 'stateset-cash-sale:':
-          const cs = await client.getCashSale(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(cs, null, 2),
-              },
-            ],
-          };
-        case 'stateset-inventory:':
-          const inventory = await client.getInventory(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(inventory, null, 2),
-              },
-            ],
-          };
-        case 'stateset-product:':
-          const product = await client.getProduct(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(product, null, 2),
-              },
-            ],
-          };
-        case 'stateset-customer:':
-          const customer = await client.getCustomer(path);
-          return {
-            contents: [
-              {
-                uri: request.params.uri,
-                mimeType: 'application/json',
-                text: JSON.stringify(customer, null, 2),
-              },
-            ],
-          };
-        default:
-          throw new Error(`Unsupported URI: ${request.params.uri}`);
+      if (!handler) {
+        throw new Error(`Unsupported URI: ${request.params.uri}`);
       }
+
+      const data = await handler(client, path);
+      return {
+        contents: [
+          {
+            uri: request.params.uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(data, null, 2),
+          },
+        ],
+      };
     });
 
     server.setRequestHandler(ListToolsRequestSchema, async () => ({

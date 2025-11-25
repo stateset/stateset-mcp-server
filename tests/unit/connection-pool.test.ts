@@ -1,5 +1,5 @@
 import { ConnectionPool } from '../../src/core/connection-pool';
-import { Config } from '../../src/config/config';
+import { Config } from '../../src/config/index';
 import nock from 'nock';
 
 describe('ConnectionPool', () => {
