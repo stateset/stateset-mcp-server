@@ -1,11 +1,11 @@
-import axios, { AxiosInstance, AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
-import { config } from '@config/index';
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { config as defaultConfig, type Config } from '@config/index';
 import { createLogger } from '@utils/logger';
 import { cacheManager } from '@core/cache';
 import { rateLimiter, Priority } from '@core/rate-limiter';
 import { circuitBreakerManager } from '@core/circuit-breaker';
 import { metrics, recordApiCall } from '@core/metrics';
-import { z } from 'zod';
+// import { z } from 'zod'; // Unused - schemas are in tools/schemas.ts
 
 const logger = createLogger('stateset-client');
 
@@ -60,31 +60,33 @@ interface StateSetResponse {
   [key: string]: any;
 }
 
-// Response with metadata
-interface ResponseWithMetadata<T> extends StateSetResponse {
-  _metadata?: {
-    requestId: string;
-    duration: number;
-    timestamp: number;
-  };
-}
+// Response with metadata - reserved for future enrichment feature
 
 export class StateSetClient {
   private readonly apiClient: AxiosInstance;
   private readonly baseUrl: string;
+  private readonly config: Config;
 
-  constructor() {
-    this.baseUrl = config.api.baseUrl;
+  // Request deduplication: prevents duplicate concurrent requests
+  private pendingRequests: Map<string, Promise<any>> = new Map();
+
+  // Retry configuration
+  private readonly maxRetries: number = 3;
+  private readonly retryableStatusCodes: Set<number> = new Set([408, 429, 500, 502, 503, 504]);
+
+  constructor(appConfig: Config = defaultConfig) {
+    this.config = appConfig;
+    this.baseUrl = this.normalizeBaseUrl(appConfig.api.baseUrl);
     
     // Create axios instance with interceptors
     this.apiClient = axios.create({
       baseURL: this.baseUrl,
-      timeout: config.api.timeout,
+      timeout: this.config.api.timeout,
       headers: {
-        'Authorization': `Bearer ${config.api.key}`,
+        'Authorization': `Bearer ${this.config.api.key}`,
         'Content-Type': 'application/json',
-        'X-API-Version': config.api.version,
-        'User-Agent': `${config.server.name}/${config.server.version}`,
+        'X-API-Version': this.config.api.version,
+        'User-Agent': `${this.config.server.name}/${this.config.server.version}`,
       },
     });
 
@@ -173,6 +175,13 @@ export class StateSetClient {
     this.setupCacheWarming();
   }
 
+  private normalizeBaseUrl(url?: string): string {
+    if (!url) {
+      return 'http://localhost:8080/api/v1';
+    }
+    return url.endsWith('/') ? url.slice(0, -1) : url;
+  }
+
   // Generic request method with all features
   private async request<T>(
     method: string,
@@ -195,31 +204,38 @@ export class StateSetClient {
             timestamp: Date.now(),
             duration: 0,
             cached: true,
-            apiVersion: config.api.version,
+            apiVersion: this.config.api.version,
           },
         };
       }
     }
 
-    // Execute request with rate limiting and circuit breaker
-    const executeRequest = async () => {
+    // Request deduplication for GET requests
+    // If an identical request is already in flight, return the same promise
+    if (method === 'GET' && this.pendingRequests.has(cacheKey)) {
+      requestLogger.debug('Request deduplicated, reusing pending request', { endpoint });
+      return this.pendingRequests.get(cacheKey)!;
+    }
+
+    // Execute request with retry logic
+    const executeWithRetry = async (retryCount: number = 0): Promise<EnrichedResponse<T>> => {
       const timer = metrics.startTimer('api_request_duration', { method, endpoint });
-      
+
       try {
         const response = await this.apiClient.request<T>({
           method,
           url: endpoint,
           data,
-          timeout: context.timeout || config.api.timeout,
+          timeout: context.timeout || this.config.api.timeout,
         });
-        
+
         timer();
-        
+
         // Cache successful GET responses
         if (method === 'GET' && response.data) {
           await cacheManager.set('api-responses', cacheKey, response.data, 300000); // 5 min TTL
         }
-        
+
         // Add metadata if response is an object
         if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
           (response.data as any)._metadata = {
@@ -228,7 +244,7 @@ export class StateSetClient {
             timestamp: Date.now(),
           };
         }
-        
+
         return {
           data: response.data,
           metadata: {
@@ -237,13 +253,34 @@ export class StateSetClient {
             duration: (response.data as any)?._metadata?.duration || 0,
             cached: false,
             rateLimitRemaining: parseInt(response.headers['x-ratelimit-remaining'] || '0'),
-            apiVersion: response.headers['x-api-version'] || config.api.version,
+            apiVersion: response.headers['x-api-version'] || this.config.api.version,
           },
         };
       } catch (error) {
         timer();
+
+        // Check if we should retry
+        if (retryCount < this.maxRetries && this.isRetryableError(error)) {
+          const delay = this.calculateRetryDelay(retryCount, error);
+          requestLogger.warn('Request failed, retrying', {
+            endpoint,
+            retryCount: retryCount + 1,
+            maxRetries: this.maxRetries,
+            delayMs: delay,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return executeWithRetry(retryCount + 1);
+        }
+
         throw error;
       }
+    };
+
+    // Wrap with rate limiting and circuit breaker
+    const executeRequest = async (): Promise<EnrichedResponse<T>> => {
+      return executeWithRetry(0);
     };
 
     // Apply rate limiting
@@ -253,8 +290,8 @@ export class StateSetClient {
       context.priority
     );
 
-    // Apply circuit breaker
-    return circuitBreakerManager.execute(
+    // Create the request promise
+    const requestPromise = circuitBreakerManager.execute(
       `api.${endpoint}`,
       rateLimitedRequest,
       {
@@ -267,6 +304,63 @@ export class StateSetClient {
         },
       }
     );
+
+    // Store pending GET requests for deduplication
+    if (method === 'GET') {
+      this.pendingRequests.set(cacheKey, requestPromise);
+
+      // Clean up after request completes (success or failure)
+      requestPromise.finally(() => {
+        this.pendingRequests.delete(cacheKey);
+      });
+    }
+
+    return requestPromise;
+  }
+
+  /**
+   * Determine if an error is retryable (transient)
+   */
+  private isRetryableError(error: any): boolean {
+    // Network errors (no response) are retryable
+    if (!error.response && !error.statusCode) {
+      return true;
+    }
+
+    // Check for retryable HTTP status codes
+    const statusCode = error.response?.status || error.statusCode;
+    if (statusCode && this.retryableStatusCodes.has(statusCode)) {
+      return true;
+    }
+
+    // Axios timeout errors are retryable
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Calculate delay before retry with exponential backoff and jitter
+   */
+  private calculateRetryDelay(retryCount: number, error: any): number {
+    // Check for Retry-After header (rate limiting)
+    const retryAfter = error.response?.headers?.['retry-after'];
+    if (retryAfter) {
+      const retryAfterMs = parseInt(retryAfter, 10) * 1000;
+      if (!isNaN(retryAfterMs)) {
+        return Math.min(retryAfterMs, 30000); // Cap at 30 seconds
+      }
+    }
+
+    // Exponential backoff with jitter: base * 2^retryCount + random jitter
+    const baseDelay = 1000; // 1 second
+    const maxDelay = 10000; // 10 seconds
+    const exponentialDelay = baseDelay * Math.pow(2, retryCount);
+    const jitter = Math.random() * 1000; // 0-1 second jitter
+
+    return Math.min(exponentialDelay + jitter, maxDelay);
   }
 
   // Helper methods
@@ -365,33 +459,28 @@ export class StateSetClient {
   async createRMA(args: any): Promise<StateSetResponse> {
     const response = await this.request<StateSetResponse>(
       'POST',
-      '/rmas',
+      '/returns',
       args,
       { requestId: this.generateRequestId(), operation: 'createRMA', priority: Priority.HIGH }
     );
     
     return {
       ...response.data,
-      url: `${this.baseUrl}/dashboard/rmas/${response.data.id}`,
+      url: `${this.baseUrl}/returns/${response.data.id}`,
     };
   }
 
-  async updateRMA(args: any): Promise<StateSetResponse> {
-    const { rma_id, ...data } = args;
-    const response = await this.request<StateSetResponse>(
-      'PATCH',
-      `/rmas/${rma_id}`,
-      data,
-      { requestId: this.generateRequestId(), operation: 'updateRMA', priority: Priority.NORMAL }
+  async updateRMA(): Promise<never> {
+    throw new StateSetApiError(
+      'Updating returns is not supported. Use stateset_approve_return or stateset_restock_return instead.',
+      405
     );
-    
-    return response.data;
   }
 
   async getRMA(rmaId: string): Promise<StateSetResponse> {
     const response = await this.request<StateSetResponse>(
       'GET',
-      `/rmas/${rmaId}`,
+      `/returns/${rmaId}`,
       undefined,
       { requestId: this.generateRequestId(), operation: 'getRMA', priority: Priority.NORMAL }
     );
@@ -402,11 +491,31 @@ export class StateSetClient {
   async listRMAs(args: { page?: number; per_page?: number } = {}): Promise<StateSetResponse[]> {
     const response = await this.request<StateSetResponse[]>(
       'GET',
-      '/rmas',
+      '/returns',
       args,
       { requestId: this.generateRequestId(), operation: 'listRMAs', priority: Priority.LOW }
     );
     
+    return response.data;
+  }
+
+  async approveReturn(returnId: string): Promise<StateSetResponse> {
+    const response = await this.request<StateSetResponse>(
+      'POST',
+      `/returns/${returnId}/approve`,
+      undefined,
+      { requestId: this.generateRequestId(), operation: 'approveReturn', priority: Priority.NORMAL }
+    );
+    return response.data;
+  }
+
+  async restockReturn(returnId: string): Promise<any> {
+    const response = await this.request<any>(
+      'POST',
+      `/returns/${returnId}/restock`,
+      undefined,
+      { requestId: this.generateRequestId(), operation: 'restockReturn', priority: Priority.NORMAL }
+    );
     return response.data;
   }
 
@@ -537,14 +646,8 @@ export class StateSetClient {
   // Add all missing methods
 
   // Delete methods
-  async deleteRMA(rmaId: string): Promise<StateSetResponse> {
-    const response = await this.request<StateSetResponse>(
-      'DELETE',
-      `/rmas/${rmaId}`,
-      undefined,
-      { requestId: this.generateRequestId(), operation: 'deleteRMA', priority: Priority.NORMAL }
-    );
-    return response.data;
+  async deleteRMA(): Promise<never> {
+    throw new StateSetApiError('Deleting returns is not supported by the StateSet API', 405);
   }
 
   async deleteOrder(orderId: string): Promise<StateSetResponse> {
@@ -734,23 +837,30 @@ export class StateSetClient {
     return response.data;
   }
 
-  async updateShipment(args: any): Promise<StateSetResponse> {
-    const { shipment_id, ...data } = args;
+  async updateShipment(): Promise<never> {
+    throw new StateSetApiError('Updating shipments is not supported. Use mark shipment operations instead.', 405);
+  }
+
+  async deleteShipment(): Promise<never> {
+    throw new StateSetApiError('Deleting shipments is not supported by the StateSet API.', 405);
+  }
+
+  async markShipmentShipped(shipmentId: string): Promise<StateSetResponse> {
     const response = await this.request<StateSetResponse>(
-      'PATCH',
-      `/shipments/${shipment_id}`,
-      data,
-      { requestId: this.generateRequestId(), operation: 'updateShipment', priority: Priority.NORMAL }
+      'POST',
+      `/shipments/${shipmentId}/ship`,
+      undefined,
+      { requestId: this.generateRequestId(), operation: 'markShipmentShipped', priority: Priority.NORMAL }
     );
     return response.data;
   }
 
-  async deleteShipment(shipmentId: string): Promise<StateSetResponse> {
+  async markShipmentDelivered(shipmentId: string): Promise<StateSetResponse> {
     const response = await this.request<StateSetResponse>(
-      'DELETE',
-      `/shipments/${shipmentId}`,
+      'POST',
+      `/shipments/${shipmentId}/deliver`,
       undefined,
-      { requestId: this.generateRequestId(), operation: 'deleteShipment', priority: Priority.NORMAL }
+      { requestId: this.generateRequestId(), operation: 'markShipmentDelivered', priority: Priority.NORMAL }
     );
     return response.data;
   }

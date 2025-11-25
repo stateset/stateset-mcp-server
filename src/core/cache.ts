@@ -197,7 +197,7 @@ class LFUCache<T> extends CacheStrategy<T> {
     }
   }
 
-  onAccess(key: string): void {
+  onAccess(_key: string): void {
     // Hits are already updated in the base get method
   }
 }
@@ -215,7 +215,7 @@ class FIFOCache<T> extends CacheStrategy<T> {
     logger.debug('FIFO eviction', { key: keyToEvict });
   }
 
-  onAccess(key: string): void {
+  onAccess(_key: string): void {
     // FIFO doesn't care about access patterns
   }
 
@@ -245,12 +245,9 @@ function createCacheStrategy<T>(strategy: string, maxSize: number): CacheStrateg
 // Main Cache Manager
 export class CacheManager {
   private caches: Map<string, CacheStrategy<any>> = new Map();
-  private defaultTTL: number;
   private warmupFunctions: Map<string, () => Promise<void>> = new Map();
 
   constructor() {
-    this.defaultTTL = config.cache.ttl * 1000; // Convert to milliseconds
-    
     // Start periodic cleanup
     if (config.cache.enabled) {
       this.startCleanupTimer();
@@ -306,7 +303,7 @@ export class CacheManager {
         logger.info('Cleared cache namespace', { namespace });
       }
     } else {
-      for (const [ns, cache] of this.caches.entries()) {
+      for (const [ _ns, cache] of this.caches.entries()) {
         cache.clear();
       }
       logger.info('Cleared all caches');
@@ -383,8 +380,8 @@ export class CacheManager {
 export const cacheManager = new CacheManager();
 
 // Cache decorators
-export function Cacheable(namespace: string, ttl?: number) {
-  return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
+export function Cacheable(namespace: string, _ttl?: number) {
+  return function (_target: any, propertyName: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {

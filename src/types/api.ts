@@ -1,4 +1,4 @@
-import type { Address, BaseItem, PricedItem, TrackedItem, WarrantyItem } from './common';
+import type { Address, BaseItem, PricedItem, TrackedItem } from './common';
 
 /**
  * Base StateSet API response

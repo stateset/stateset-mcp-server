@@ -1,10 +1,9 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { PrometheusExporter } from '@opentelemetry/exporter-prometheus';
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { Resource } from '@opentelemetry/resources';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
-import { trace, context, SpanStatusCode, Span, SpanKind } from '@opentelemetry/api';
+import { trace as otelTrace, context, SpanStatusCode, Span, SpanKind } from '@opentelemetry/api';
 import { config } from '@config/index';
 import { createLogger } from '@utils/logger';
 
@@ -13,7 +12,7 @@ const logger = createLogger('telemetry');
 export class TelemetryService {
   private static instance: TelemetryService;
   private sdk: NodeSDK | null = null;
-  private tracer = trace.getTracer('stateset-mcp-server', '1.0.0');
+  private tracer = otelTrace.getTracer('stateset-mcp-server', '1.0.0');
 
   private constructor() {}
 
@@ -50,7 +49,7 @@ export class TelemetryService {
         }
       );
 
-      // Create SDK
+      // Create SDK - PrometheusExporter is a metric reader
       this.sdk = new NodeSDK({
         resource,
         instrumentations: [
@@ -60,17 +59,14 @@ export class TelemetryService {
             },
           }),
         ],
-        metricReader: new PeriodicExportingMetricReader({
-          exporter: prometheusExporter,
-          exportIntervalMillis: 10000,
-        }),
+        metricReader: prometheusExporter,
       });
 
       // Start SDK
       await this.sdk.start();
       logger.info('OpenTelemetry initialized successfully');
     } catch (error) {
-      logger.error({ error }, 'Failed to initialize OpenTelemetry');
+      logger.error('Failed to initialize OpenTelemetry', error);
       throw error;
     }
   }
@@ -81,7 +77,7 @@ export class TelemetryService {
         await this.sdk.shutdown();
         logger.info('OpenTelemetry shut down successfully');
       } catch (error) {
-        logger.error({ error }, 'Error shutting down OpenTelemetry');
+        logger.error('Error shutting down OpenTelemetry', error);
       }
     }
   }
@@ -101,7 +97,7 @@ export class TelemetryService {
     };
 
     if (options?.parentSpan) {
-      const ctx = trace.setSpan(context.active(), options.parentSpan);
+      const ctx = otelTrace.setSpan(context.active(), options.parentSpan);
       return this.tracer.startSpan(name, spanOptions, ctx);
     }
 
@@ -168,7 +164,7 @@ export class TelemetryService {
 
   // Add event to current span
   addEvent(name: string, attributes?: Record<string, any>): void {
-    const span = trace.getActiveSpan();
+    const span = otelTrace.getActiveSpan();
     if (span) {
       span.addEvent(name, attributes);
     }
@@ -176,7 +172,7 @@ export class TelemetryService {
 
   // Set attributes on current span
   setAttributes(attributes: Record<string, any>): void {
-    const span = trace.getActiveSpan();
+    const span = otelTrace.getActiveSpan();
     if (span) {
       span.setAttributes(attributes);
     }

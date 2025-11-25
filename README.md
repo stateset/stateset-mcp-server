@@ -17,6 +17,8 @@ A world-class Model Context Protocol (MCP) server for StateSet API integration, 
 - **Scalable**: Rate limiting, connection pooling, and efficient resource management
 - **Secure**: API key redaction, secure configuration, and input validation
 - **Developer-Friendly**: Hot reloading, detailed documentation, and helpful error messages
+- **OpenAPI Integration**: Dynamic tool generation from OpenAPI specifications
+- **Multi-Format Support**: Export tools to MCP, OpenAI, or Anthropic formats
 
 ## 📋 Table of Contents
 

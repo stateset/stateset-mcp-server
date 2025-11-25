@@ -7,17 +7,23 @@ export async function handleToolCall(toolName: string, args: any): Promise<any> 
     case "stateset_create_rma":
       return statesetClient.createRMA(schemas.CreateRMAArgsSchema.parse(args));
     case "stateset_update_rma":
-      return statesetClient.updateRMA(schemas.UpdateRMAArgsSchema.parse(args));
-    case "stateset_delete_rma": {
-      const { rma_id } = schemas.DeleteRMAArgsSchema.parse(args);
-      return statesetClient.deleteRMA(rma_id);
-    }
+      throw new Error('Updating returns is no longer supported. Use stateset_approve_return or stateset_restock_return.');
+    case "stateset_delete_rma":
+      throw new Error('Deleting returns is not supported by the StateSet API.');
     case "stateset_get_rma": {
       const { rma_id } = schemas.GetRMAArgsSchema.parse(args);
       return statesetClient.getRMA(rma_id);
     }
     case "stateset_list_rmas":
       return statesetClient.listRMAs(schemas.ListArgsSchema.parse(args));
+    case "stateset_approve_return": {
+      const { rma_id } = schemas.GetRMAArgsSchema.parse(args);
+      return statesetClient.approveReturn(rma_id);
+    }
+    case "stateset_restock_return": {
+      const { rma_id } = schemas.GetRMAArgsSchema.parse(args);
+      return statesetClient.restockReturn(rma_id);
+    }
 
     // Order operations
     case "stateset_create_order":
@@ -103,17 +109,23 @@ export async function handleToolCall(toolName: string, args: any): Promise<any> 
     case "stateset_create_shipment":
       return statesetClient.createShipment(schemas.CreateShipmentArgsSchema.parse(args));
     case "stateset_update_shipment":
-      return statesetClient.updateShipment(schemas.UpdateShipmentArgsSchema.parse(args));
-    case "stateset_delete_shipment": {
-      const { shipment_id } = schemas.DeleteShipmentArgsSchema.parse(args);
-      return statesetClient.deleteShipment(shipment_id);
-    }
+      throw new Error('Shipment updates are not supported. Use stateset_mark_shipment_shipped or stateset_mark_shipment_delivered.');
+    case "stateset_delete_shipment":
+      throw new Error('Deleting shipments is not supported by the StateSet API.');
     case "stateset_get_shipment": {
       const { shipment_id } = schemas.GetShipmentArgsSchema.parse(args);
       return statesetClient.getShipment(shipment_id);
     }
     case "stateset_list_shipments":
       return statesetClient.listShipments(schemas.ListArgsSchema.parse(args));
+    case "stateset_mark_shipment_shipped": {
+      const { shipment_id } = schemas.GetShipmentArgsSchema.parse(args);
+      return statesetClient.markShipmentShipped(shipment_id);
+    }
+    case "stateset_mark_shipment_delivered": {
+      const { shipment_id } = schemas.GetShipmentArgsSchema.parse(args);
+      return statesetClient.markShipmentDelivered(shipment_id);
+    }
 
     // Sales Order operations
     case "stateset_create_sales_order":

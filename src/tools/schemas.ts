@@ -2,62 +2,55 @@ import { z } from 'zod';
 
 // Common schemas
 const AddressSchema = z.object({
-  line1: z.string().min(1, "Address line 1 is required"),
+  street: z.string().min(1, "Street is required"),
   city: z.string().min(1, "City is required"),
   state: z.string().min(2, "State is required"),
-  postal_code: z.string().min(5, "Postal code is required"),
+  postal_code: z.string().min(3, "Postal code is required"),
   country: z.string().min(2, "Country is required"),
 });
 
 // RMA schemas
 export const CreateRMAArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  customer_email: z.string().email("Invalid email format"),
+  order_id: z.string().uuid('Order ID must be a valid UUID'),
   reason: z.string().min(1, "Reason is required"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-  })).min(1, "At least one item is required"),
   notes: z.string().optional(),
 });
 
 export const UpdateRMAArgsSchema = z.object({
-  rma_id: z.string().min(1, "RMA ID is required"),
-  status: z.string().optional(),
-  resolution: z.string().optional(),
+  rma_id: z.string().uuid('Return ID must be a valid UUID'),
+  status: z.enum(['approved', 'restocked']).optional(),
   notes: z.string().optional(),
 });
 
 export const DeleteRMAArgsSchema = z.object({
-  rma_id: z.string().min(1, "RMA ID is required"),
+  rma_id: z.string().uuid('Return ID must be a valid UUID'),
 });
 
 export const GetRMAArgsSchema = z.object({
-  rma_id: z.string().min(1, "RMA ID is required"),
+  rma_id: z.string().uuid('Return ID must be a valid UUID'),
 });
 
 // Order schemas
 export const CreateOrderArgsSchema = z.object({
-  customer_email: z.string().email("Invalid email format"),
+  customer_id: z.string().uuid('Customer ID is required'),
   items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    price: z.number().positive("Price must be positive"),
+    product_id: z.string().min(1, "Product ID is required"),
+    quantity: z.number().int().positive("Quantity must be positive"),
+    unit_price: z.number().positive("Unit price must be positive").optional(),
+    tax_rate: z.number().nonnegative().optional(),
   })).min(1, "At least one item is required"),
-  shipping_address: AddressSchema,
+  shipping_address: AddressSchema.optional(),
   billing_address: AddressSchema.optional(),
+  payment_method_id: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 export const UpdateOrderArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  status: z.string().optional(),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    price: z.number().positive("Price must be positive"),
-  })).optional(),
+  order_id: z.string().uuid('Order ID must be a valid UUID'),
   shipping_address: AddressSchema.optional(),
   billing_address: AddressSchema.optional(),
+  payment_method_id: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 export const DeleteOrderArgsSchema = z.object({
@@ -116,23 +109,31 @@ export const GetCustomerArgsSchema = z.object({
 
 // Inventory schemas
 export const CreateInventoryArgsSchema = z.object({
-  product_id: z.string().min(1, "Product ID is required"),
-  quantity: z.number().nonnegative(),
-  location: z.string().min(1, "Location is required"),
+  item_number: z.string().min(1, "Item number is required"),
+  description: z.string().optional(),
+  primary_uom_code: z.string().optional(),
+  organization_id: z.number().int().positive().optional(),
+  location_id: z.number().int().positive("Location ID is required"),
+  quantity_on_hand: z.number().int(),
+  reason: z.string().optional(),
 });
 
 export const UpdateInventoryArgsSchema = z.object({
-  inventory_id: z.string().min(1, "Inventory ID is required"),
-  quantity: z.number().nonnegative().optional(),
-  location: z.string().min(1, "Location is required").optional(),
+  inventory_id: z.string().uuid('Inventory ID must be a valid UUID'),
+  location_id: z.number().int().positive(),
+  on_hand: z.number().int().optional(),
+  description: z.string().optional(),
+  primary_uom_code: z.string().optional(),
+  organization_id: z.number().int().positive().optional(),
+  reason: z.string().optional(),
 });
 
 export const DeleteInventoryArgsSchema = z.object({
-  inventory_id: z.string().min(1, "Inventory ID is required"),
+  inventory_id: z.string().uuid('Inventory ID must be a valid UUID'),
 });
 
 export const GetInventoryArgsSchema = z.object({
-  inventory_id: z.string().min(1, "Inventory ID is required"),
+  inventory_id: z.string().uuid('Inventory ID must be a valid UUID'),
 });
 
 // Warranty schemas
@@ -163,31 +164,27 @@ export const GetWarrantyArgsSchema = z.object({
 
 // Shipment schemas
 export const CreateShipmentArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  customer_email: z.string().email("Invalid email format"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    tracking_number: z.string().optional(),
-  })).min(1, "At least one item is required"),
-  carrier: z.string().min(1, "Carrier is required"),
-  destination_address: AddressSchema,
+  order_id: z.string().uuid('Order ID must be a valid UUID'),
+  shipping_address: z.string().min(1, "Shipping address is required"),
+  shipping_method: z.string().min(1, "Shipping method is required"),
+  tracking_number: z.string().min(1, "Tracking number is required"),
+  recipient_name: z.string().min(1, "Recipient name is required"),
 });
 
 export const UpdateShipmentArgsSchema = z.object({
-  shipment_id: z.string().min(1, "Shipment ID is required"),
-  carrier: z.string().optional(),
-  status: z.string().optional(),
+  shipment_id: z.string().uuid('Shipment ID must be a valid UUID'),
+  shipping_method: z.string().optional(),
   tracking_number: z.string().optional(),
-  destination_address: AddressSchema.optional(),
+  recipient_name: z.string().optional(),
+  shipping_address: z.string().optional(),
 });
 
 export const DeleteShipmentArgsSchema = z.object({
-  shipment_id: z.string().min(1, "Shipment ID is required"),
+  shipment_id: z.string().uuid('Shipment ID must be a valid UUID'),
 });
 
 export const GetShipmentArgsSchema = z.object({
-  shipment_id: z.string().min(1, "Shipment ID is required"),
+  shipment_id: z.string().uuid('Shipment ID must be a valid UUID'),
 });
 
 // Sales Order schemas
@@ -312,6 +309,206 @@ export const DeletePaymentArgsSchema = z.object({
 
 export const GetPaymentArgsSchema = z.object({
   payment_id: z.string().min(1, "Payment ID is required"),
+});
+
+// ASN (Advanced Shipment Notice) schemas
+export const CreateASNArgsSchema = z.object({
+  purchase_order_id: z.string().min(1, "Purchase Order ID is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+    tracking_number: z.string().optional(),
+  })).min(1, "At least one item is required"),
+  carrier: z.string().min(1, "Carrier is required"),
+  destination_address: AddressSchema,
+});
+
+export const UpdateASNArgsSchema = z.object({
+  asn_id: z.string().min(1, "ASN ID is required"),
+  carrier: z.string().optional(),
+  status: z.string().optional(),
+  tracking_number: z.string().optional(),
+  destination_address: AddressSchema.optional(),
+});
+
+export const DeleteASNArgsSchema = z.object({
+  asn_id: z.string().min(1, "ASN ID is required"),
+});
+
+export const GetASNArgsSchema = z.object({
+  asn_id: z.string().min(1, "ASN ID is required"),
+});
+
+// Bill of Materials schemas
+export const CreateBillOfMaterialsArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+  customer_email: z.string().email("Invalid email format"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+    price: z.number().positive("Price must be positive"),
+  })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+export const UpdateBillOfMaterialsArgsSchema = z.object({
+  bill_of_materials_id: z.string().min(1, "Bill of Materials ID is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+    price: z.number().positive("Price must be positive"),
+  })).optional(),
+  notes: z.string().optional(),
+});
+
+export const DeleteBillOfMaterialsArgsSchema = z.object({
+  bill_of_materials_id: z.string().min(1, "Bill of Materials ID is required"),
+});
+
+export const GetBillOfMaterialsArgsSchema = z.object({
+  bill_of_materials_id: z.string().min(1, "Bill of Materials ID is required"),
+});
+
+// Work Order schemas
+export const CreateWorkOrderArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+  customer_email: z.string().email("Invalid email format"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+export const UpdateWorkOrderArgsSchema = z.object({
+  work_order_id: z.string().min(1, "Work Order ID is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).optional(),
+  notes: z.string().optional(),
+});
+
+export const DeleteWorkOrderArgsSchema = z.object({
+  work_order_id: z.string().min(1, "Work Order ID is required"),
+});
+
+export const GetWorkOrderArgsSchema = z.object({
+  work_order_id: z.string().min(1, "Work Order ID is required"),
+});
+
+// Manufacturer Order schemas
+export const CreateManufacturerOrderArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+  customer_email: z.string().email("Invalid email format"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+export const UpdateManufacturerOrderArgsSchema = z.object({
+  manufacturer_order_id: z.string().min(1, "Manufacturer Order ID is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).optional(),
+  notes: z.string().optional(),
+});
+
+export const DeleteManufacturerOrderArgsSchema = z.object({
+  manufacturer_order_id: z.string().min(1, "Manufacturer Order ID is required"),
+});
+
+export const GetManufacturerOrderArgsSchema = z.object({
+  manufacturer_order_id: z.string().min(1, "Manufacturer Order ID is required"),
+});
+
+// Fulfillment Order schemas
+export const CreateFulfillmentOrderArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+  customer_email: z.string().email("Invalid email format"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+    tracking_number: z.string().optional(),
+  })).min(1, "At least one item is required"),
+  carrier: z.string().min(1, "Carrier is required"),
+  destination_address: AddressSchema,
+});
+
+export const UpdateFulfillmentOrderArgsSchema = z.object({
+  fulfillment_order_id: z.string().min(1, "Fulfillment Order ID is required"),
+  carrier: z.string().optional(),
+  status: z.string().optional(),
+  tracking_number: z.string().optional(),
+  destination_address: AddressSchema.optional(),
+});
+
+export const DeleteFulfillmentOrderArgsSchema = z.object({
+  fulfillment_order_id: z.string().min(1, "Fulfillment Order ID is required"),
+});
+
+export const GetFulfillmentOrderArgsSchema = z.object({
+  fulfillment_order_id: z.string().min(1, "Fulfillment Order ID is required"),
+});
+
+// Item Receipt schemas
+export const CreateItemReceiptArgsSchema = z.object({
+  order_id: z.string().min(1, "Order ID is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).min(1, "At least one item is required"),
+  notes: z.string().optional(),
+});
+
+export const UpdateItemReceiptArgsSchema = z.object({
+  item_receipt_id: z.string().min(1, "Item Receipt ID is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+  })).optional(),
+  notes: z.string().optional(),
+});
+
+export const DeleteItemReceiptArgsSchema = z.object({
+  item_receipt_id: z.string().min(1, "Item Receipt ID is required"),
+});
+
+export const GetItemReceiptArgsSchema = z.object({
+  item_receipt_id: z.string().min(1, "Item Receipt ID is required"),
+});
+
+// Cash Sale schemas
+export const CreateCashSaleArgsSchema = z.object({
+  customer_email: z.string().email("Invalid email format"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+    price: z.number().positive("Price must be positive"),
+  })).min(1, "At least one item is required"),
+  payment_method: z.string().min(1, "Payment method is required"),
+});
+
+export const UpdateCashSaleArgsSchema = z.object({
+  cash_sale_id: z.string().min(1, "Cash Sale ID is required"),
+  items: z.array(z.object({
+    item_id: z.string().min(1, "Item ID is required"),
+    quantity: z.number().positive("Quantity must be positive"),
+    price: z.number().positive("Price must be positive"),
+  })).optional(),
+  payment_method: z.string().optional(),
+  status: z.string().optional(),
+});
+
+export const DeleteCashSaleArgsSchema = z.object({
+  cash_sale_id: z.string().min(1, "Cash Sale ID is required"),
+});
+
+export const GetCashSaleArgsSchema = z.object({
+  cash_sale_id: z.string().min(1, "Cash Sale ID is required"),
 });
 
 // Common schemas

@@ -2,30 +2,20 @@
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequest,
-  CallToolRequestSchema,
-  ListResourcesRequestSchema,
-  ListToolsRequestSchema,
-  ReadResourceRequestSchema,
-  ListResourceTemplatesRequestSchema,
-  ListPromptsRequestSchema,
-  GetPromptRequestSchema,
-  Tool,
-  ResourceTemplate,
-  Prompt,
-} from "@modelcontextprotocol/sdk/types.js";
-import axios, { AxiosError, AxiosInstance } from 'axios';
+import { CallToolRequestSchema, ReadResourceRequestSchema, ListToolsRequestSchema, ListResourceTemplatesRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
+import axios, { AxiosInstance, AxiosError } from 'axios';
 import dotenv from 'dotenv';
-import { z, ZodError } from 'zod';
-import pino from 'pino';
-
-// Logger setup
-const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  timestamp: pino.stdTimeFunctions.isoTime,
-});
-
+import { logger } from './utils/logger';
+import { tools, resourceTemplates, serverPrompt } from './tools/definitions';
+import * as schemas from './tools/schemas';
+import { executeBatchOperations } from './tools/batch-operations';
+import { handleError } from './middleware/error-handler';
+import { buildSearchQuery } from './tools/search-tools';
+import { sanitizeString, validateContentLength, validateNoSqlInjection } from './utils/validation';
+import { CircuitBreaker, CircuitState } from './core/circuit-breaker';
+import { cacheManager, CacheStats } from './core/cache';
+import { wsManager } from './core/websocket';
 
 // Configuration
 interface Config {
@@ -162,10 +152,48 @@ interface DeleteCustomerArgs {
   customer_id: string;
 }
 
-interface GetCustomerArgs {
-  customer_id: string;
-}
+/**
+ * Sanitize and validate tool arguments for security
+ * @param args The raw arguments from the tool call
+ * @param toolName The name of the tool being called
+ * @returns Sanitized arguments
+ */
+function sanitizeToolArguments(args: Record<string, unknown>, toolName: string): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
 
+  for (const [key, value] of Object.entries(args)) {
+    if (typeof value === 'string') {
+      // Validate content length
+      validateContentLength(value, 50000);
+
+      // Check for SQL injection patterns in text fields
+      if (key.includes('note') || key.includes('description') || key.includes('comment')) {
+        validateNoSqlInjection(value);
+      }
+
+      // Sanitize string values
+      sanitized[key] = sanitizeString(value);
+    } else if (Array.isArray(value)) {
+      // Recursively sanitize array items
+      sanitized[key] = value.map((item: unknown) => {
+        if (typeof item === 'object' && item !== null) {
+          return sanitizeToolArguments(item as Record<string, unknown>, toolName);
+        }
+        if (typeof item === 'string') {
+          return sanitizeString(item);
+        }
+        return item;
+      });
+    } else if (typeof value === 'object' && value !== null) {
+      // Recursively sanitize nested objects
+      sanitized[key] = sanitizeToolArguments(value as Record<string, unknown>, toolName);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+
+  return sanitized;
+}
 
 interface CreateRMAArgs {
   order_id: string;
@@ -282,9 +310,6 @@ interface DeletePurchaseOrderArgs {
   purchase_order_id: string;
 }
 
-interface GetPurchaseOrderArgs {
-  purchase_order_id: string;
-}
 
 interface CreateASNArgs {
   purchase_order_id: string;
@@ -305,9 +330,6 @@ interface DeleteASNArgs {
   asn_id: string;
 }
 
-interface GetASNArgs {
-  asn_id: string;
-}
 
 interface CreateInvoiceArgs {
   order_id: string;
@@ -371,41 +393,14 @@ interface DeletePaymentArgs {
   payment_id: string;
 }
 
-interface GetRMAArgs {
-  rma_id: string;
-}
 
-interface GetOrderArgs {
-  order_id: string;
-}
 
-interface GetWarrantyArgs {
-  warranty_id: string;
-}
 
-interface GetShipmentArgs {
-  shipment_id: string;
-}
 
-interface GetBillOfMaterialsArgs {
-  bill_of_materials_id: string;
-}
 
-interface GetWorkOrderArgs {
-  work_order_id: string;
-}
 
-interface GetManufacturerOrderArgs {
-  manufacturer_order_id: string;
-}
 
-interface GetInvoiceArgs {
-  invoice_id: string;
-}
 
-interface GetPaymentArgs {
-  payment_id: string;
-}
 
 interface CreateSalesOrderArgs {
   customer_email: string;
@@ -426,9 +421,6 @@ interface DeleteSalesOrderArgs {
   sales_order_id: string;
 }
 
-interface GetSalesOrderArgs {
-  sales_order_id: string;
-}
 
 interface CreateFulfillmentOrderArgs {
   order_id: string;
@@ -450,9 +442,6 @@ interface DeleteFulfillmentOrderArgs {
   fulfillment_order_id: string;
 }
 
-interface GetFulfillmentOrderArgs {
-  fulfillment_order_id: string;
-}
 
 interface CreateItemReceiptArgs {
   order_id: string;
@@ -470,9 +459,6 @@ interface DeleteItemReceiptArgs {
   item_receipt_id: string;
 }
 
-interface GetItemReceiptArgs {
-  item_receipt_id: string;
-}
 
 interface CreateCashSaleArgs {
   customer_email: string;
@@ -491,9 +477,6 @@ interface DeleteCashSaleArgs {
   cash_sale_id: string;
 }
 
-interface GetCashSaleArgs {
-  cash_sale_id: string;
-}
 
 interface CreateProductArgs {
   name: string;
@@ -514,9 +497,6 @@ interface DeleteProductArgs {
   product_id: string;
 }
 
-interface GetProductArgs {
-  product_id: string;
-}
 
 interface CreateInventoryArgs {
   product_id: string;
@@ -534,16 +514,13 @@ interface DeleteInventoryArgs {
   inventory_id: string;
 }
 
-interface GetInventoryArgs {
-  inventory_id: string;
-}
 
 interface ListArgs {
   page?: number;
   per_page?: number;
 }
 
-interface GetApiMetricsArgs {}
+// GetApiMetricsArgs removed - unused
 
 // Rate Limiter
 class RateLimiter {
@@ -565,14 +542,14 @@ class RateLimiter {
     return new Promise((resolve, reject) => {
       this.queue.push(async () => {
         try {
-          logger.debug({ operation }, 'Starting API request');
+          logger.debug('Starting API request', { operation });
           const result = await this.executeWithRetry(fn, operation, retries);
           const duration = Date.now() - startTime;
           this.trackRequest(startTime, duration);
-          logger.debug({ operation, duration }, 'Completed API request');
+          logger.debug('Completed API request', { operation, duration });
           resolve(result);
         } catch (error) {
-          logger.error({ operation, error }, 'API request failed');
+          logger.error('API request failed', error, { operation });
           reject(error);
         }
       });
@@ -589,7 +566,7 @@ class RateLimiter {
           throw error;
         }
         const delay = Math.pow(2, attempt - 1) * 1000;
-        logger.warn({ operation, attempt, delay }, 'Retrying API request');
+        logger.warn('Retrying API request', { operation, attempt, delay });
         await new Promise(res => setTimeout(res, delay));
       }
     }
@@ -648,30 +625,261 @@ class RateLimiter {
   }
 }
 
+// Tool Rate Limit Categories
+type ToolCategory = 'read' | 'create' | 'update' | 'delete' | 'batch' | 'admin';
+
+interface ToolRateLimitConfig {
+  requestsPerMinute: number;
+  burstSize: number;
+}
+
+interface ToolRateLimitMetrics {
+  category: ToolCategory;
+  requestsInLastMinute: number;
+  tokensRemaining: number;
+  isThrottled: boolean;
+  lastRequestTime: string;
+}
+
+// Per-Tool Rate Limiter with Token Bucket Algorithm
+class ToolRateLimiter {
+  private readonly limits: Record<ToolCategory, ToolRateLimitConfig> = {
+    read: { requestsPerMinute: 120, burstSize: 20 },      // High throughput for reads
+    create: { requestsPerMinute: 30, burstSize: 5 },      // Moderate for creates
+    update: { requestsPerMinute: 60, burstSize: 10 },     // Medium for updates
+    delete: { requestsPerMinute: 20, burstSize: 3 },      // Conservative for deletes
+    batch: { requestsPerMinute: 10, burstSize: 2 },       // Very limited for batch operations
+    admin: { requestsPerMinute: 30, burstSize: 5 },       // Moderate for admin/metrics
+  };
+
+  private readonly buckets: Map<ToolCategory, {
+    tokens: number;
+    lastRefill: number;
+    requestTimestamps: number[];
+  }> = new Map();
+
+  constructor(customLimits?: Partial<Record<ToolCategory, ToolRateLimitConfig>>) {
+    // Apply custom limits if provided
+    if (customLimits) {
+      for (const [category, config] of Object.entries(customLimits)) {
+        if (this.limits[category as ToolCategory]) {
+          this.limits[category as ToolCategory] = { ...this.limits[category as ToolCategory], ...config };
+        }
+      }
+    }
+
+    // Initialize buckets for each category
+    for (const category of Object.keys(this.limits) as ToolCategory[]) {
+      this.buckets.set(category, {
+        tokens: this.limits[category].burstSize,
+        lastRefill: Date.now(),
+        requestTimestamps: [],
+      });
+    }
+  }
+
+  // Categorize a tool based on its name
+  private categorize(toolName: string): ToolCategory {
+    if (toolName.includes('batch') || toolName.includes('csv_import')) {
+      return 'batch';
+    }
+    if (toolName.includes('_delete_')) {
+      return 'delete';
+    }
+    if (toolName.includes('_create_')) {
+      return 'create';
+    }
+    if (toolName.includes('_update_')) {
+      return 'update';
+    }
+    if (toolName.includes('_get_') || toolName.includes('_list_') || toolName.includes('_search')) {
+      return 'read';
+    }
+    // Admin tools: health_check, cache_stats, clear_cache, metrics
+    if (toolName.includes('health') || toolName.includes('cache') || toolName.includes('metrics')) {
+      return 'admin';
+    }
+    // Default to create for unknown operations (conservative)
+    return 'create';
+  }
+
+  // Refill tokens based on elapsed time
+  private refillTokens(category: ToolCategory): void {
+    const bucket = this.buckets.get(category)!;
+    const config = this.limits[category];
+    const now = Date.now();
+    const elapsedMs = now - bucket.lastRefill;
+    const tokensToAdd = (elapsedMs / 60000) * config.requestsPerMinute;
+
+    bucket.tokens = Math.min(config.burstSize, bucket.tokens + tokensToAdd);
+    bucket.lastRefill = now;
+
+    // Clean up old timestamps (older than 1 minute)
+    const oneMinuteAgo = now - 60000;
+    bucket.requestTimestamps = bucket.requestTimestamps.filter(t => t > oneMinuteAgo);
+  }
+
+  // Check if a tool can be executed (acquire token)
+  async acquire(toolName: string): Promise<{ allowed: boolean; waitTimeMs: number; category: ToolCategory }> {
+    const category = this.categorize(toolName);
+    this.refillTokens(category);
+
+    const bucket = this.buckets.get(category)!;
+    const config = this.limits[category];
+
+    // Check if we have tokens available
+    if (bucket.tokens >= 1) {
+      bucket.tokens -= 1;
+      bucket.requestTimestamps.push(Date.now());
+      return { allowed: true, waitTimeMs: 0, category };
+    }
+
+    // Calculate wait time until next token is available
+    const msPerToken = 60000 / config.requestsPerMinute;
+    const waitTimeMs = Math.ceil(msPerToken - ((Date.now() - bucket.lastRefill) % msPerToken));
+
+    return { allowed: false, waitTimeMs, category };
+  }
+
+  // Wait for rate limit and then proceed
+  async waitAndAcquire(toolName: string): Promise<ToolCategory> {
+    let result = await this.acquire(toolName);
+
+    while (!result.allowed) {
+      logger.debug('Tool rate limited, waiting', {
+        toolName,
+        category: result.category,
+        waitTimeMs: result.waitTimeMs,
+      });
+      await new Promise(resolve => setTimeout(resolve, result.waitTimeMs));
+      result = await this.acquire(toolName);
+    }
+
+    return result.category;
+  }
+
+  // Get metrics for a specific category or all categories
+  getMetrics(category?: ToolCategory): ToolRateLimitMetrics | Record<ToolCategory, ToolRateLimitMetrics> {
+    if (category) {
+      this.refillTokens(category);
+      const bucket = this.buckets.get(category)!;
+      const lastTimestamp = bucket.requestTimestamps[bucket.requestTimestamps.length - 1];
+      return {
+        category,
+        requestsInLastMinute: bucket.requestTimestamps.length,
+        tokensRemaining: Math.floor(bucket.tokens),
+        isThrottled: bucket.tokens < 1,
+        lastRequestTime: lastTimestamp !== undefined
+          ? new Date(lastTimestamp).toISOString()
+          : 'never',
+      };
+    }
+
+    const allMetrics: Record<ToolCategory, ToolRateLimitMetrics> = {} as any;
+    for (const cat of Object.keys(this.limits) as ToolCategory[]) {
+      allMetrics[cat] = this.getMetrics(cat) as ToolRateLimitMetrics;
+    }
+    return allMetrics;
+  }
+
+  // Get limit configuration
+  getLimits(): Record<ToolCategory, ToolRateLimitConfig> {
+    return { ...this.limits };
+  }
+}
+
+// Singleton tool rate limiter
+const toolRateLimiter = new ToolRateLimiter();
+
+// Operation Timeout Configuration
+type OperationType = 'read' | 'create' | 'update' | 'delete' | 'batch' | 'search' | 'default';
+
+interface OperationTimeoutConfig {
+  timeouts: Record<OperationType, number>;
+  getTimeout(operationName: string): number;
+}
+
+function createOperationTimeoutConfig(defaultTimeoutMs: number): OperationTimeoutConfig {
+  const timeouts: Record<OperationType, number> = {
+    read: defaultTimeoutMs,                    // Standard read operations
+    create: defaultTimeoutMs * 1.5,            // Create operations may take longer
+    update: defaultTimeoutMs * 1.5,            // Update operations may take longer
+    delete: defaultTimeoutMs,                  // Delete operations are usually quick
+    batch: defaultTimeoutMs * 5,               // Batch operations need much more time
+    search: defaultTimeoutMs * 2,              // Search operations may involve complex queries
+    default: defaultTimeoutMs,
+  };
+
+  return {
+    timeouts,
+    getTimeout(operationName: string): number {
+      const lowerName = operationName.toLowerCase();
+
+      if (lowerName.includes('batch') || lowerName.includes('csv')) {
+        return timeouts.batch;
+      }
+      if (lowerName.includes('search') || lowerName.includes('list') || lowerName.includes('query')) {
+        return timeouts.search;
+      }
+      if (lowerName.includes('create')) {
+        return timeouts.create;
+      }
+      if (lowerName.includes('update') || lowerName.includes('patch')) {
+        return timeouts.update;
+      }
+      if (lowerName.includes('delete')) {
+        return timeouts.delete;
+      }
+      if (lowerName.includes('get')) {
+        return timeouts.read;
+      }
+      return timeouts.default;
+    },
+  };
+}
+
 // Main Client
 class StateSetMCPClient {
   private readonly apiClient: AxiosInstance;
   private readonly rateLimiter: RateLimiter;
   private readonly baseUrl: string;
+  private readonly circuitBreaker: CircuitBreaker;
+  private readonly timeoutConfig: OperationTimeoutConfig;
 
   constructor(config: Config) {
     if (!config.apiKey) throw new Error('API key is required');
-    
+
     this.baseUrl = config.baseUrl;
     this.rateLimiter = new RateLimiter(config.requestsPerHour);
+    this.timeoutConfig = createOperationTimeoutConfig(config.timeoutMs);
+    this.circuitBreaker = new CircuitBreaker('stateset-api', {
+      failureThreshold: 5,
+      successThreshold: 3,
+      timeout: config.timeoutMs,
+      resetTimeout: 30000, // 30 seconds
+      volumeThreshold: 10,
+      errorFilter: (error: Error) => {
+        // Only count server errors and network errors for circuit breaker
+        if (axios.isAxiosError(error)) {
+          return !error.response || error.response.status >= 500;
+        }
+        return true;
+      },
+    });
+
     this.apiClient = axios.create({
       baseURL: config.baseUrl,
       headers: {
         'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json',
       },
-      timeout: config.timeoutMs,
+      timeout: config.timeoutMs, // Default timeout, will be overridden per-request
     });
 
     this.apiClient.interceptors.response.use(
       response => response,
       (error: AxiosError) => {
-        logger.error({ error: error.message, code: error.code }, 'API request failed');
+        logger.error('API request failed', { message: error.message, code: error.code });
         throw error;
       }
     );
@@ -691,10 +899,89 @@ class StateSetMCPClient {
     };
   }
 
+  /**
+   * Execute an API call with circuit breaker protection and rate limiting
+   */
+  private async executeWithProtection<T>(
+    fn: () => Promise<T>,
+    operationName: string
+  ): Promise<T> {
+    const timeout = this.timeoutConfig.getTimeout(operationName);
+    logger.debug('Executing operation with timeout', { operationName, timeoutMs: timeout });
+
+    return this.circuitBreaker.execute(async () => {
+      return this.rateLimiter.enqueue(fn, operationName);
+    });
+  }
+
+  /**
+   * Create a request config with operation-specific timeout
+   */
+  private getRequestConfig(operationName: string): { timeout: number } {
+    return { timeout: this.timeoutConfig.getTimeout(operationName) };
+  }
+
+  /**
+   * Get timeout configuration for monitoring
+   */
+  getTimeoutConfig(): Record<OperationType, number> {
+    return this.timeoutConfig.timeouts;
+  }
+
+  /**
+   * Get circuit breaker status for health checks
+   */
+  getCircuitBreakerStatus(): { state: CircuitState; metrics: any } {
+    return {
+      state: this.circuitBreaker.getState(),
+      metrics: this.circuitBreaker.getMetrics(),
+    };
+  }
+
+  /**
+   * Get data with caching support
+   */
+  private async getCached<T>(
+    cacheKey: string,
+    namespace: string,
+    fetcher: () => Promise<T>,
+    ttlMs: number = 60000 // 1 minute default
+  ): Promise<T> {
+    const cached = await cacheManager.get<T>(namespace, cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const result = await fetcher();
+    cacheManager.set(namespace, cacheKey, result, ttlMs);
+    return result;
+  }
+
+  /**
+   * Invalidate cache entries for a resource
+   */
+  invalidateCache(namespace: string, pattern?: string): void {
+    if (pattern) {
+      // For now, clear the entire namespace
+      // A more sophisticated implementation would use pattern matching
+      cacheManager.clear(namespace);
+    } else {
+      cacheManager.clear(namespace);
+    }
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats(): Record<string, CacheStats> | CacheStats {
+    return cacheManager.getStats();
+  }
+
   async createRMA(args: CreateRMAArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.post('/rmas', args),
-      'createRMA'
+    const operationName = 'createRMA';
+    const response = await this.executeWithProtection(
+      () => this.apiClient.post('/rmas', args, this.getRequestConfig(operationName)),
+      operationName
     );
     const rma = response.data;
     return this.enrichResponse({
@@ -709,7 +996,7 @@ class StateSetMCPClient {
   }
 
   async updateRMA(args: UpdateRMAArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/rmas/${args.rma_id}`, args),
       'updateRMA'
     );
@@ -725,7 +1012,7 @@ class StateSetMCPClient {
   }
 
   async createOrder(args: CreateOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/orders', args),
       'createOrder'
     );
@@ -742,7 +1029,7 @@ class StateSetMCPClient {
   }
 
   async updateOrder(args: UpdateOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/orders/${args.order_id}`, args),
       'updateOrder'
     );
@@ -750,7 +1037,7 @@ class StateSetMCPClient {
   }
 
   async createWarranty(args: CreateWarrantyArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/warranties', args),
       'createWarranty'
     );
@@ -767,7 +1054,7 @@ class StateSetMCPClient {
   }
 
   async updateWarranty(args: UpdateWarrantyArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/warranties/${args.warranty_id}`, args),
       'updateWarranty'
     );
@@ -775,7 +1062,7 @@ class StateSetMCPClient {
   }
 
   async createShipment(args: CreateShipmentArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/shipments', args),
       'createShipment'
     );
@@ -792,7 +1079,7 @@ class StateSetMCPClient {
   }
 
   async updateShipment(args: UpdateShipmentArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/shipments/${args.shipment_id}`, args),
       'updateShipment'
     );
@@ -800,80 +1087,136 @@ class StateSetMCPClient {
   }
 
   async getRMA(rmaId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.get(`/rmas/${rmaId}`),
-      'getRMA'
+    return this.getCached(
+      `rma:${rmaId}`,
+      'rmas',
+      async () => {
+        const response = await this.executeWithProtection(
+          () => this.apiClient.get(`/rmas/${rmaId}`),
+          'getRMA'
+        );
+        const rma = response.data;
+        return this.enrichResponse({
+          id: rma.id,
+          order_id: rma.order_id,
+          customer_email: rma.customer_email,
+          status: rma.status,
+          created_at: rma.created_at,
+          updated_at: rma.updated_at,
+          url: `${this.baseUrl}/dashboard/rmas/${rma.id}`,
+        });
+      },
+      120000 // 2 minute TTL
     );
-    const rma = response.data;
-    return this.enrichResponse({
-      id: rma.id,
-      order_id: rma.order_id,
-      customer_email: rma.customer_email,
-      status: rma.status,
-      created_at: rma.created_at,
-      updated_at: rma.updated_at,
-      url: `${this.baseUrl}/dashboard/rmas/${rma.id}`,
-    });
   }
 
   async getOrder(orderId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.get(`/orders/${orderId}`),
-      'getOrder'
+    return this.getCached(
+      `order:${orderId}`,
+      'orders',
+      async () => {
+        const response = await this.executeWithProtection(
+          () => this.apiClient.get(`/orders/${orderId}`),
+          'getOrder'
+        );
+        return this.enrichResponse(response.data);
+      },
+      120000
     );
-    return this.enrichResponse(response.data);
   }
 
   async getWarranty(warrantyId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.get(`/warranties/${warrantyId}`),
-      'getWarranty'
+    return this.getCached(
+      `warranty:${warrantyId}`,
+      'warranties',
+      async () => {
+        const response = await this.executeWithProtection(
+          () => this.apiClient.get(`/warranties/${warrantyId}`),
+          'getWarranty'
+        );
+        return this.enrichResponse(response.data);
+      },
+      120000
     );
-    return this.enrichResponse(response.data);
   }
 
   async getShipment(shipmentId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.get(`/shipments/${shipmentId}`),
-      'getShipment'
+    return this.getCached(
+      `shipment:${shipmentId}`,
+      'shipments',
+      async () => {
+        const response = await this.executeWithProtection(
+          () => this.apiClient.get(`/shipments/${shipmentId}`),
+          'getShipment'
+        );
+        return this.enrichResponse(response.data);
+      },
+      60000 // 1 minute TTL for shipments (they change more frequently)
     );
-    return this.enrichResponse(response.data);
   }
 
   async getBillOfMaterials(bomId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.get(`/bill-of-materials/${bomId}`),
-      'getBillOfMaterials'
+    return this.getCached(
+      `bom:${bomId}`,
+      'bom',
+      async () => {
+        const response = await this.executeWithProtection(
+          () => this.apiClient.get(`/bill-of-materials/${bomId}`),
+          'getBillOfMaterials'
+        );
+        return this.enrichResponse(response.data);
+      },
+      300000 // 5 minute TTL for BOMs (they change infrequently)
     );
-    return this.enrichResponse(response.data);
   }
 
   async getWorkOrder(workOrderId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.get(`/work-orders/${workOrderId}`),
-      'getWorkOrder'
+    return this.getCached(
+      `workorder:${workOrderId}`,
+      'workorders',
+      async () => {
+        const response = await this.executeWithProtection(
+          () => this.apiClient.get(`/work-orders/${workOrderId}`),
+          'getWorkOrder'
+        );
+        return this.enrichResponse(response.data);
+      },
+      60000
     );
-    return this.enrichResponse(response.data);
   }
 
   async getManufacturerOrder(manufacturerOrderId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.get(`/manufacturer-orders/${manufacturerOrderId}`),
-      'getManufacturerOrder'
+    return this.getCached(
+      `mfgorder:${manufacturerOrderId}`,
+      'mfgorders',
+      async () => {
+        const response = await this.executeWithProtection(
+          () => this.apiClient.get(`/manufacturer-orders/${manufacturerOrderId}`),
+          'getManufacturerOrder'
+        );
+        return this.enrichResponse(response.data);
+      },
+      120000
     );
-    return this.enrichResponse(response.data);
   }
 
   async getInvoice(invoiceId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
-      () => this.apiClient.get(`/invoices/${invoiceId}`),
-      'getInvoice'
+    return this.getCached(
+      `invoice:${invoiceId}`,
+      'invoices',
+      async () => {
+        const response = await this.executeWithProtection(
+          () => this.apiClient.get(`/invoices/${invoiceId}`),
+          'getInvoice'
+        );
+        return this.enrichResponse(response.data);
+      },
+      120000
     );
-    return this.enrichResponse(response.data);
   }
 
   async getPayment(paymentId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get(`/payments/${paymentId}`),
       'getPayment'
     );
@@ -881,7 +1224,7 @@ class StateSetMCPClient {
   }
 
   async createBillOfMaterials(args: CreateBillOfMaterialsArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/bill-of-materials', args),
       'createBillOfMaterials'
     );
@@ -889,7 +1232,7 @@ class StateSetMCPClient {
   }
 
   async updateBillOfMaterials(args: UpdateBillOfMaterialsArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/bill-of-materials/${args.bill_of_materials_id}`, args), 
       'updateBillOfMaterials'
     );
@@ -897,7 +1240,7 @@ class StateSetMCPClient {
   }
 
   async createWorkOrder(args: CreateWorkOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/work-orders', args),
       'createWorkOrder'
     );
@@ -905,7 +1248,7 @@ class StateSetMCPClient {
   }
 
   async updateWorkOrder(args: UpdateWorkOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/work-orders/${args.work_order_id}`, args),  
       'updateWorkOrder'
     );
@@ -913,7 +1256,7 @@ class StateSetMCPClient {
   }
 
   async createManufacturerOrder(args: CreateManufacturerOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/manufacturer-orders', args),
       'createManufacturerOrder'
     );
@@ -921,7 +1264,7 @@ class StateSetMCPClient {
   }
 
   async updateManufacturerOrder(args: UpdateManufacturerOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/manufacturer-orders/${args.manufacturer_order_id}`, args),
       'updateManufacturerOrder'
     );
@@ -929,7 +1272,7 @@ class StateSetMCPClient {
   }
 
   async createPurchaseOrder(args: CreatePurchaseOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/purchase-orders', args),
       'createPurchaseOrder'
     );
@@ -937,7 +1280,7 @@ class StateSetMCPClient {
   }
 
   async updatePurchaseOrder(args: UpdatePurchaseOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/purchase-orders/${args.purchase_order_id}`, args),
       'updatePurchaseOrder'
     );
@@ -945,7 +1288,7 @@ class StateSetMCPClient {
   }
 
   async deletePurchaseOrder(args: DeletePurchaseOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/purchase-orders/${args.purchase_order_id}`),
       'deletePurchaseOrder'
     );
@@ -953,7 +1296,7 @@ class StateSetMCPClient {
   }
 
   async getPurchaseOrder(purchaseOrderId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get(`/purchase-orders/${purchaseOrderId}`),
       'getPurchaseOrder'
     );
@@ -961,7 +1304,7 @@ class StateSetMCPClient {
   }
 
   async listPurchaseOrders(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/purchase-orders', { params: args }),
       'listPurchaseOrders'
     );
@@ -969,7 +1312,7 @@ class StateSetMCPClient {
   }
 
   async createASN(args: CreateASNArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/asns', args),
       'createASN'
     );
@@ -977,7 +1320,7 @@ class StateSetMCPClient {
   }
 
   async updateASN(args: UpdateASNArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/asns/${args.asn_id}`, args),
       'updateASN'
     );
@@ -985,7 +1328,7 @@ class StateSetMCPClient {
   }
 
   async deleteASN(args: DeleteASNArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/asns/${args.asn_id}`),
       'deleteASN'
     );
@@ -993,7 +1336,7 @@ class StateSetMCPClient {
   }
 
   async getASN(asnId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get(`/asns/${asnId}`),
       'getASN'
     );
@@ -1001,7 +1344,7 @@ class StateSetMCPClient {
   }
 
   async listASNs(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/asns', { params: args }),
       'listASNs'
     );
@@ -1009,7 +1352,7 @@ class StateSetMCPClient {
   }
 
   async createInvoice(args: CreateInvoiceArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/invoices', args),
       'createInvoice'
     );
@@ -1017,7 +1360,7 @@ class StateSetMCPClient {
   }
 
   async updateInvoice(args: UpdateInvoiceArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/invoices/${args.invoice_id}`, args),
       'updateInvoice'
     );
@@ -1025,7 +1368,7 @@ class StateSetMCPClient {
   }
 
   async createPayment(args: CreatePaymentArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/payments', args),
       'createPayment'
     );
@@ -1033,7 +1376,7 @@ class StateSetMCPClient {
   }
 
   async updatePayment(args: UpdatePaymentArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/payments/${args.payment_id}`, args),
       'updatePayment'
     );
@@ -1041,7 +1384,7 @@ class StateSetMCPClient {
   }
 
   async createSalesOrder(args: CreateSalesOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/sales-orders', args),
       'createSalesOrder'
     );
@@ -1049,7 +1392,7 @@ class StateSetMCPClient {
   }
 
   async updateSalesOrder(args: UpdateSalesOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/sales-orders/${args.sales_order_id}`, args),
       'updateSalesOrder'
     );
@@ -1057,7 +1400,7 @@ class StateSetMCPClient {
   }
 
   async deleteSalesOrder(args: DeleteSalesOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/sales-orders/${args.sales_order_id}`),
       'deleteSalesOrder'
     );
@@ -1065,7 +1408,7 @@ class StateSetMCPClient {
   }
 
   async getSalesOrder(salesOrderId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get(`/sales-orders/${salesOrderId}`),
       'getSalesOrder'
     );
@@ -1073,7 +1416,7 @@ class StateSetMCPClient {
   }
 
   async listSalesOrders(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/sales-orders', { params: args }),
       'listSalesOrders'
     );
@@ -1081,7 +1424,7 @@ class StateSetMCPClient {
   }
 
   async createFulfillmentOrder(args: CreateFulfillmentOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/fulfillment-orders', args),
       'createFulfillmentOrder'
     );
@@ -1089,7 +1432,7 @@ class StateSetMCPClient {
   }
 
   async updateFulfillmentOrder(args: UpdateFulfillmentOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/fulfillment-orders/${args.fulfillment_order_id}`, args),
       'updateFulfillmentOrder'
     );
@@ -1097,7 +1440,7 @@ class StateSetMCPClient {
   }
 
   async deleteFulfillmentOrder(args: DeleteFulfillmentOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/fulfillment-orders/${args.fulfillment_order_id}`),
       'deleteFulfillmentOrder'
     );
@@ -1105,7 +1448,7 @@ class StateSetMCPClient {
   }
 
   async getFulfillmentOrder(fulfillmentOrderId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get(`/fulfillment-orders/${fulfillmentOrderId}`),
       'getFulfillmentOrder'
     );
@@ -1113,7 +1456,7 @@ class StateSetMCPClient {
   }
 
   async listFulfillmentOrders(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/fulfillment-orders', { params: args }),
       'listFulfillmentOrders'
     );
@@ -1121,7 +1464,7 @@ class StateSetMCPClient {
   }
 
   async createItemReceipt(args: CreateItemReceiptArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/item-receipts', args),
       'createItemReceipt'
     );
@@ -1129,7 +1472,7 @@ class StateSetMCPClient {
   }
 
   async updateItemReceipt(args: UpdateItemReceiptArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/item-receipts/${args.item_receipt_id}`, args),
       'updateItemReceipt'
     );
@@ -1137,7 +1480,7 @@ class StateSetMCPClient {
   }
 
   async deleteItemReceipt(args: DeleteItemReceiptArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/item-receipts/${args.item_receipt_id}`),
       'deleteItemReceipt'
     );
@@ -1145,7 +1488,7 @@ class StateSetMCPClient {
   }
 
   async getItemReceipt(itemReceiptId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get(`/item-receipts/${itemReceiptId}`),
       'getItemReceipt'
     );
@@ -1153,7 +1496,7 @@ class StateSetMCPClient {
   }
 
   async listItemReceipts(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/item-receipts', { params: args }),
       'listItemReceipts'
     );
@@ -1161,7 +1504,7 @@ class StateSetMCPClient {
   }
 
   async createCashSale(args: CreateCashSaleArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/cash-sales', args),
       'createCashSale'
     );
@@ -1169,7 +1512,7 @@ class StateSetMCPClient {
   }
 
   async updateCashSale(args: UpdateCashSaleArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/cash-sales/${args.cash_sale_id}`, args),
       'updateCashSale'
     );
@@ -1177,7 +1520,7 @@ class StateSetMCPClient {
   }
 
   async deleteCashSale(args: DeleteCashSaleArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/cash-sales/${args.cash_sale_id}`),
       'deleteCashSale'
     );
@@ -1185,7 +1528,7 @@ class StateSetMCPClient {
   }
 
   async getCashSale(cashSaleId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get(`/cash-sales/${cashSaleId}`),
       'getCashSale'
     );
@@ -1193,7 +1536,7 @@ class StateSetMCPClient {
   }
 
   async listCashSales(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/cash-sales', { params: args }),
       'listCashSales'
     );
@@ -1201,7 +1544,7 @@ class StateSetMCPClient {
   }
 
   async createCustomer(args: CreateCustomerArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/customers', args),
       'createCustomer'
     );
@@ -1209,7 +1552,7 @@ class StateSetMCPClient {
   }
 
   async updateCustomer(args: UpdateCustomerArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/customers/${args.customer_id}`, args),
       'updateCustomer'
     );
@@ -1217,7 +1560,7 @@ class StateSetMCPClient {
   }
 
   async deleteCustomer(args: DeleteCustomerArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/customers/${args.customer_id}`),
       'deleteCustomer'
     );
@@ -1225,7 +1568,7 @@ class StateSetMCPClient {
   }
 
   async getCustomer(customerId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get(`/customers/${customerId}`),
       'getCustomer'
     );
@@ -1233,7 +1576,7 @@ class StateSetMCPClient {
   }
 
   async listCustomers(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/customers', { params: args }),
       'listCustomers'
     );
@@ -1241,7 +1584,7 @@ class StateSetMCPClient {
   }
 
   async deleteRMA(args: DeleteRMAArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/rmas/${args.rma_id}`),
       'deleteRMA'
     );
@@ -1249,7 +1592,7 @@ class StateSetMCPClient {
   }
 
   async deleteOrder(args: DeleteOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/orders/${args.order_id}`),
       'deleteOrder'
     );
@@ -1257,7 +1600,7 @@ class StateSetMCPClient {
   }
 
   async deleteWarranty(args: DeleteWarrantyArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/warranties/${args.warranty_id}`),
       'deleteWarranty'
     );
@@ -1265,7 +1608,7 @@ class StateSetMCPClient {
   }
 
   async deleteShipment(args: DeleteShipmentArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/shipments/${args.shipment_id}`),
       'deleteShipment'
     );
@@ -1273,7 +1616,7 @@ class StateSetMCPClient {
   }
 
   async deleteBillOfMaterials(args: DeleteBillOfMaterialsArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/bill-of-materials/${args.bill_of_materials_id}`),
       'deleteBillOfMaterials'
     );
@@ -1281,7 +1624,7 @@ class StateSetMCPClient {
   }
 
   async deleteWorkOrder(args: DeleteWorkOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/work-orders/${args.work_order_id}`),
       'deleteWorkOrder'
     );
@@ -1289,7 +1632,7 @@ class StateSetMCPClient {
   }
 
   async deleteManufacturerOrder(args: DeleteManufacturerOrderArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/manufacturer-orders/${args.manufacturer_order_id}`),
       'deleteManufacturerOrder'
     );
@@ -1297,7 +1640,7 @@ class StateSetMCPClient {
   }
 
   async deleteInvoice(args: DeleteInvoiceArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/invoices/${args.invoice_id}`),
       'deleteInvoice'
     );
@@ -1305,7 +1648,7 @@ class StateSetMCPClient {
   }
 
   async deletePayment(args: DeletePaymentArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/payments/${args.payment_id}`),
       'deletePayment'
     );
@@ -1313,7 +1656,7 @@ class StateSetMCPClient {
   }
 
   async listRMAs(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/rmas', { params: args }),
       'listRMAs'
     );
@@ -1321,7 +1664,7 @@ class StateSetMCPClient {
   }
 
   async listOrders(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/orders', { params: args }),
       'listOrders'
     );
@@ -1329,7 +1672,7 @@ class StateSetMCPClient {
   }
 
   async listWarranties(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/warranties', { params: args }),
       'listWarranties'
     );
@@ -1337,7 +1680,7 @@ class StateSetMCPClient {
   }
 
   async listShipments(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/shipments', { params: args }),
       'listShipments'
     );
@@ -1345,7 +1688,7 @@ class StateSetMCPClient {
   }
 
   async listBillOfMaterials(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/bill-of-materials', { params: args }),
       'listBillOfMaterials'
     );
@@ -1353,7 +1696,7 @@ class StateSetMCPClient {
   }
 
   async listWorkOrders(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/work-orders', { params: args }),
       'listWorkOrders'
     );
@@ -1361,7 +1704,7 @@ class StateSetMCPClient {
   }
 
   async listManufacturerOrders(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/manufacturer-orders', { params: args }),
       'listManufacturerOrders'
     );
@@ -1369,7 +1712,7 @@ class StateSetMCPClient {
   }
 
   async listInvoices(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/invoices', { params: args }),
       'listInvoices'
     );
@@ -1377,7 +1720,7 @@ class StateSetMCPClient {
   }
 
   async listPayments(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/payments', { params: args }),
       'listPayments'
     );
@@ -1385,7 +1728,7 @@ class StateSetMCPClient {
   }
 
   async createProduct(args: CreateProductArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/products', args),
       'createProduct'
     );
@@ -1393,7 +1736,7 @@ class StateSetMCPClient {
   }
 
   async updateProduct(args: UpdateProductArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/products/${args.product_id}`, args),
       'updateProduct'
     );
@@ -1401,7 +1744,7 @@ class StateSetMCPClient {
   }
 
   async deleteProduct(args: DeleteProductArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/products/${args.product_id}`),
       'deleteProduct'
     );
@@ -1409,7 +1752,7 @@ class StateSetMCPClient {
   }
 
   async getProduct(productId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get(`/products/${productId}`),
       'getProduct'
     );
@@ -1417,7 +1760,7 @@ class StateSetMCPClient {
   }
 
   async listProducts(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/products', { params: args }),
       'listProducts'
     );
@@ -1425,7 +1768,7 @@ class StateSetMCPClient {
   }
 
   async createInventory(args: CreateInventoryArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.post('/inventory', args),
       'createInventory'
     );
@@ -1433,7 +1776,7 @@ class StateSetMCPClient {
   }
 
   async updateInventory(args: UpdateInventoryArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.patch(`/inventory/${args.inventory_id}`, args),
       'updateInventory'
     );
@@ -1441,7 +1784,7 @@ class StateSetMCPClient {
   }
 
   async deleteInventory(args: DeleteInventoryArgs): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.delete(`/inventory/${args.inventory_id}`),
       'deleteInventory'
     );
@@ -1449,7 +1792,7 @@ class StateSetMCPClient {
   }
 
   async getInventory(inventoryId: string): Promise<StateSetResponse> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get(`/inventory/${inventoryId}`),
       'getInventory'
     );
@@ -1457,7 +1800,7 @@ class StateSetMCPClient {
   }
 
   async listInventories(args: ListArgs = {}): Promise<{ items: StateSetResponse[]; metadata: { apiMetrics: RateLimiterMetrics } }> {
-    const response = await this.rateLimiter.enqueue(
+    const response = await this.executeWithProtection(
       () => this.apiClient.get('/inventory', { params: args }),
       'listInventories'
     );
@@ -1467,1348 +1810,122 @@ class StateSetMCPClient {
   getApiMetrics(): { apiMetrics: RateLimiterMetrics } {
     return { apiMetrics: this.rateLimiter.getMetrics() };
   }
+
+  async healthCheck(includeDetails: boolean = false): Promise<{
+    status: 'healthy' | 'degraded' | 'unhealthy';
+    timestamp: string;
+    version: string;
+    uptime: number;
+    components: {
+      api: { status: string; latency?: number; error?: string };
+      rateLimiter: { status: string; metrics?: RateLimiterMetrics };
+      circuitBreaker: { status: string; state?: CircuitState; metrics?: any };
+    };
+  }> {
+    const result: {
+      status: 'healthy' | 'degraded' | 'unhealthy';
+      timestamp: string;
+      version: string;
+      uptime: number;
+      components: {
+        api: { status: string; latency?: number; error?: string };
+        rateLimiter: { status: string; metrics?: RateLimiterMetrics };
+        circuitBreaker: { status: string; state?: CircuitState; metrics?: any };
+      };
+    } = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      uptime: process.uptime(),
+      components: {
+        api: { status: 'unknown' },
+        rateLimiter: { status: 'unknown' },
+        circuitBreaker: { status: 'unknown' },
+      },
+    };
+
+    // Check API connectivity
+    try {
+      const apiStart = Date.now();
+      await this.apiClient.get('/health', { timeout: 5000 });
+      result.components.api = {
+        status: 'healthy',
+        latency: Date.now() - apiStart,
+      };
+    } catch (error) {
+      result.components.api = {
+        status: 'unhealthy',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+      result.status = 'degraded';
+    }
+
+    // Check rate limiter
+    const rateLimiterMetrics = this.rateLimiter.getMetrics();
+    const rateLimiterHealthy = rateLimiterMetrics.queueLength < 100;
+    result.components.rateLimiter = {
+      status: rateLimiterHealthy ? 'healthy' : 'degraded',
+    };
+
+    if (includeDetails) {
+      result.components.rateLimiter.metrics = rateLimiterMetrics;
+    }
+
+    if (!rateLimiterHealthy) {
+      result.status = result.status === 'healthy' ? 'degraded' : result.status;
+    }
+
+    // Check circuit breaker
+    const cbStatus = this.getCircuitBreakerStatus();
+    const cbHealthy = cbStatus.state === CircuitState.CLOSED;
+    result.components.circuitBreaker = {
+      status: cbHealthy ? 'healthy' : (cbStatus.state === CircuitState.HALF_OPEN ? 'degraded' : 'unhealthy'),
+      state: cbStatus.state,
+    };
+
+    if (includeDetails) {
+      result.components.circuitBreaker.metrics = cbStatus.metrics;
+    }
+
+    if (cbStatus.state === CircuitState.OPEN) {
+      result.status = 'unhealthy';
+    } else if (cbStatus.state === CircuitState.HALF_OPEN && result.status !== 'unhealthy') {
+      result.status = 'degraded';
+    }
+
+    return result;
+  }
 }
 
-// Zod Schemas
-const CreateRMAArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  customer_email: z.string().email("Invalid email format"),
-  reason: z.string().min(1, "Reason is required"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-  })).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
-
-const UpdateRMAArgsSchema = z.object({
-  rma_id: z.string().min(1, "RMA ID is required"),
-  status: z.string().optional(),
-  resolution: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-const CreateOrderArgsSchema = z.object({
-  customer_email: z.string().email("Invalid email format"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    price: z.number().positive("Price must be positive"),
-  })).min(1, "At least one item is required"),
-  shipping_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }),
-  billing_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-});
-
-const UpdateOrderArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  status: z.string().optional(),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    price: z.number().positive("Price must be positive"),
-  })).optional(),
-  shipping_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-  billing_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-});
-
-const CreateWarrantyArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  customer_email: z.string().email("Invalid email format"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    serial_number: z.string().optional(),
-    warranty_period_months: z.number().positive("Warranty period must be positive"),
-  })).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
-
-const UpdateWarrantyArgsSchema = z.object({
-  warranty_id: z.string().min(1, "Warranty ID is required"),
-  status: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-const CreateShipmentArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  customer_email: z.string().email("Invalid email format"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    tracking_number: z.string().optional(),
-  })).min(1, "At least one item is required"),
-  carrier: z.string().min(1, "Carrier is required"),
-  destination_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }),
-});
-
-const UpdateShipmentArgsSchema = z.object({
-  shipment_id: z.string().min(1, "Shipment ID is required"),
-  carrier: z.string().optional(),
-  status: z.string().optional(),
-  tracking_number: z.string().optional(),
-  destination_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-});
-
-const CreateBillOfMaterialsArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  customer_email: z.string().email("Invalid email format"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    price: z.number().positive("Price must be positive"),
-  })).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
-
-const UpdateBillOfMaterialsArgsSchema = z.object({
-  bill_of_materials_id: z.string().min(1, "Bill of Materials ID is required"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    price: z.number().positive("Price must be positive"),
-  })).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
-
-const CreateWorkOrderArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  customer_email: z.string().email("Invalid email format"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-  })).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
-
-const UpdateWorkOrderArgsSchema = z.object({
-  work_order_id: z.string().min(1, "Work Order ID is required"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-  })).min(1, "At least one item is required"),
-  status: z.string().optional(),
-  notes: z.string().optional(),
-}); 
-
-const CreateManufacturerOrderArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  customer_email: z.string().email("Invalid email format"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-  })).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
-
-const UpdateManufacturerOrderArgsSchema = z.object({
-  manufacturer_order_id: z.string().min(1, "Manufacturer Order ID is required"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-  })).min(1, "At least one item is required"),
-  status: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-const CreatePurchaseOrderArgsSchema = z.object({
-  vendor_email: z.string().email("Invalid email format"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    price: z.number().positive("Price must be positive"),
-  })).min(1, "At least one item is required"),
-  shipping_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }),
-  billing_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-});
-
-const UpdatePurchaseOrderArgsSchema = z.object({
-  purchase_order_id: z.string().min(1, "Purchase Order ID is required"),
-  status: z.string().optional(),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    price: z.number().positive("Price must be positive"),
-  })).optional(),
-  shipping_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-  billing_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-});
-
-const DeletePurchaseOrderArgsSchema = z.object({
-  purchase_order_id: z.string().min(1, "Purchase Order ID is required"),
-});
-
-const GetPurchaseOrderArgsSchema = z.object({
-  purchase_order_id: z.string().min(1, "Purchase Order ID is required"),
-});
-
-const CreateASNArgsSchema = z.object({
-  purchase_order_id: z.string().min(1, "Purchase Order ID is required"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    tracking_number: z.string().optional(),
-  })).min(1, "At least one item is required"),
-  carrier: z.string().min(1, "Carrier is required"),
-  destination_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }),
-});
-
-const UpdateASNArgsSchema = z.object({
-  asn_id: z.string().min(1, "ASN ID is required"),
-  carrier: z.string().optional(),
-  status: z.string().optional(),
-  tracking_number: z.string().optional(),
-  destination_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-});
-
-const DeleteASNArgsSchema = z.object({
-  asn_id: z.string().min(1, "ASN ID is required"),
-});
-
-const GetASNArgsSchema = z.object({
-  asn_id: z.string().min(1, "ASN ID is required"),
-});
-
-const CreateInvoiceArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  customer_email: z.string().email("Invalid email format"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-  })).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
-
-const UpdateInvoiceArgsSchema = z.object({
-  invoice_id: z.string().min(1, "Invoice ID is required"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-  })).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
-
-const CreatePaymentArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  customer_email: z.string().email("Invalid email format"),
-  amount: z.number().positive("Amount must be positive"),   
-  payment_method: z.string().min(1, "Payment method is required"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-  })).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
-
-const UpdatePaymentArgsSchema = z.object({
-  payment_id: z.string().min(1, "Payment ID is required"),
-  amount: z.number().positive("Amount must be positive"),
-  payment_method: z.string().min(1, "Payment method is required"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-  })).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
-
-const CreateCustomerArgsSchema = z.object({
-  email: z.string().email("Invalid email format"),
-  name: z.string().min(1, "Name is required"),
-  address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }),
-});
-
-const UpdateCustomerArgsSchema = z.object({
-  customer_id: z.string().min(1, "Customer ID is required"),
-  email: z.string().email("Invalid email format").optional(),
-  name: z.string().min(1, "Name is required").optional(),
-  address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-});
-
-const DeleteCustomerArgsSchema = z.object({
-  customer_id: z.string().min(1, "Customer ID is required"),
-});
-
-const GetCustomerArgsSchema = z.object({
-  customer_id: z.string().min(1, "Customer ID is required"),
-});
-
-const DeleteRMAArgsSchema = z.object({
-  rma_id: z.string().min(1, "RMA ID is required"),
-});
-
-const DeleteOrderArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-});
-
-const DeleteWarrantyArgsSchema = z.object({
-  warranty_id: z.string().min(1, "Warranty ID is required"),
-});
-
-const DeleteShipmentArgsSchema = z.object({
-  shipment_id: z.string().min(1, "Shipment ID is required"),
-});
-
-const DeleteBillOfMaterialsArgsSchema = z.object({
-  bill_of_materials_id: z.string().min(1, "Bill of Materials ID is required"),
-});
-
-const DeleteWorkOrderArgsSchema = z.object({
-  work_order_id: z.string().min(1, "Work Order ID is required"),
-});
-
-const DeleteManufacturerOrderArgsSchema = z.object({
-  manufacturer_order_id: z.string().min(1, "Manufacturer Order ID is required"),
-});
-
-const DeleteInvoiceArgsSchema = z.object({
-  invoice_id: z.string().min(1, "Invoice ID is required"),
-});
-
-const DeletePaymentArgsSchema = z.object({
-  payment_id: z.string().min(1, "Payment ID is required"),
-});
-
-const GetRMAArgsSchema = z.object({
-  rma_id: z.string().min(1, "RMA ID is required"),
-});
-
-const GetOrderArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-});
-
-const GetWarrantyArgsSchema = z.object({
-  warranty_id: z.string().min(1, "Warranty ID is required"),
-});
-
-const GetShipmentArgsSchema = z.object({
-  shipment_id: z.string().min(1, "Shipment ID is required"),
-});
-
-const GetBillOfMaterialsArgsSchema = z.object({
-  bill_of_materials_id: z.string().min(1, "Bill of Materials ID is required"),
-});
-
-const GetWorkOrderArgsSchema = z.object({
-  work_order_id: z.string().min(1, "Work Order ID is required"),
-});
-
-const GetManufacturerOrderArgsSchema = z.object({
-  manufacturer_order_id: z.string().min(1, "Manufacturer Order ID is required"),
-});
-
-const GetInvoiceArgsSchema = z.object({
-  invoice_id: z.string().min(1, "Invoice ID is required"),
-});
-
-const GetPaymentArgsSchema = z.object({
-  payment_id: z.string().min(1, "Payment ID is required"),
-});
-
-const CreateSalesOrderArgsSchema = z.object({
-  customer_email: z.string().email("Invalid email format"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    price: z.number().positive("Price must be positive"),
-  })).min(1, "At least one item is required"),
-  shipping_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }),
-  billing_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-});
-
-const UpdateSalesOrderArgsSchema = z.object({
-  sales_order_id: z.string().min(1, "Sales Order ID is required"),
-  status: z.string().optional(),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    price: z.number().positive("Price must be positive"),
-  })).optional(),
-  shipping_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-  billing_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-});
-
-const DeleteSalesOrderArgsSchema = z.object({
-  sales_order_id: z.string().min(1, "Sales Order ID is required"),
-});
-
-const GetSalesOrderArgsSchema = z.object({
-  sales_order_id: z.string().min(1, "Sales Order ID is required"),
-});
-
-const CreateFulfillmentOrderArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  customer_email: z.string().email("Invalid email format"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    tracking_number: z.string().optional(),
-  })).min(1, "At least one item is required"),
-  carrier: z.string().min(1, "Carrier is required"),
-  destination_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }),
-});
-
-const UpdateFulfillmentOrderArgsSchema = z.object({
-  fulfillment_order_id: z.string().min(1, "Fulfillment Order ID is required"),
-  carrier: z.string().optional(),
-  status: z.string().optional(),
-  tracking_number: z.string().optional(),
-  destination_address: z.object({
-    line1: z.string().min(1, "Address line 1 is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2, "State is required"),
-    postal_code: z.string().min(5, "Postal code is required"),
-    country: z.string().min(2, "Country is required"),
-  }).optional(),
-});
-
-const DeleteFulfillmentOrderArgsSchema = z.object({
-  fulfillment_order_id: z.string().min(1, "Fulfillment Order ID is required"),
-});
-
-const GetFulfillmentOrderArgsSchema = z.object({
-  fulfillment_order_id: z.string().min(1, "Fulfillment Order ID is required"),
-});
-
-const CreateItemReceiptArgsSchema = z.object({
-  order_id: z.string().min(1, "Order ID is required"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-  })).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
-
-const UpdateItemReceiptArgsSchema = z.object({
-  item_receipt_id: z.string().min(1, "Item Receipt ID is required"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-  })).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-});
-
-const DeleteItemReceiptArgsSchema = z.object({
-  item_receipt_id: z.string().min(1, "Item Receipt ID is required"),
-});
-
-const GetItemReceiptArgsSchema = z.object({
-  item_receipt_id: z.string().min(1, "Item Receipt ID is required"),
-});
-
-const CreateCashSaleArgsSchema = z.object({
-  customer_email: z.string().email("Invalid email format"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    price: z.number().positive("Price must be positive"),
-  })).min(1, "At least one item is required"),
-  payment_method: z.string().min(1, "Payment method is required"),
-});
-
-const UpdateCashSaleArgsSchema = z.object({
-  cash_sale_id: z.string().min(1, "Cash Sale ID is required"),
-  items: z.array(z.object({
-    item_id: z.string().min(1, "Item ID is required"),
-    quantity: z.number().positive("Quantity must be positive"),
-    price: z.number().positive("Price must be positive"),
-  })).optional(),
-  payment_method: z.string().min(1, "Payment method is required").optional(),
-  status: z.string().optional(),
-});
-
-const DeleteCashSaleArgsSchema = z.object({
-  cash_sale_id: z.string().min(1, "Cash Sale ID is required"),
-});
-
-const GetCashSaleArgsSchema = z.object({
-  cash_sale_id: z.string().min(1, "Cash Sale ID is required"),
-});
-
-const CreateProductArgsSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  sku: z.string().min(1, "SKU is required"),
-  description: z.string().optional(),
-  price: z.number().positive("Price must be positive"),
-});
-
-const UpdateProductArgsSchema = z.object({
-  product_id: z.string().min(1, "Product ID is required"),
-  name: z.string().min(1, "Name is required").optional(),
-  sku: z.string().min(1, "SKU is required").optional(),
-  description: z.string().optional(),
-  price: z.number().positive("Price must be positive").optional(),
-});
-
-const DeleteProductArgsSchema = z.object({
-  product_id: z.string().min(1, "Product ID is required"),
-});
-
-const GetProductArgsSchema = z.object({
-  product_id: z.string().min(1, "Product ID is required"),
-});
-
-const CreateInventoryArgsSchema = z.object({
-  product_id: z.string().min(1, "Product ID is required"),
-  quantity: z.number().nonnegative(),
-  location: z.string().min(1, "Location is required"),
-});
-
-const UpdateInventoryArgsSchema = z.object({
-  inventory_id: z.string().min(1, "Inventory ID is required"),
-  quantity: z.number().nonnegative().optional(),
-  location: z.string().min(1, "Location is required").optional(),
-});
-
-const DeleteInventoryArgsSchema = z.object({
-  inventory_id: z.string().min(1, "Inventory ID is required"),
-});
-
-const GetInventoryArgsSchema = z.object({
-  inventory_id: z.string().min(1, "Inventory ID is required"),
-});
-
-const ListArgsSchema = z.object({
-  page: z.number().positive().optional(),
-  per_page: z.number().positive().optional(),
-});
-
-const GetApiMetricsArgsSchema = z.object({});
-
-
-// Tool Definitions
-const createRMATool: Tool = {
-  name: "stateset_create_rma",
-  description: "Creates a new RMA request",
-  inputSchema: CreateRMAArgsSchema.shape as any,
-};
-
-const updateRMATool: Tool = {
-  name: "stateset_update_rma",
-  description: "Updates an existing RMA",
-  inputSchema: UpdateRMAArgsSchema.shape as any,
-};
-
-const createOrderTool: Tool = {
-  name: "stateset_create_order",
-  description: "Creates a new customer order",
-  inputSchema: CreateOrderArgsSchema.shape as any,
-};
-
-const updateOrderTool: Tool = {
-  name: "stateset_update_order",
-  description: "Updates an order record",
-  inputSchema: UpdateOrderArgsSchema.shape as any,
-};
-
-const createWarrantyTool: Tool = {
-  name: "stateset_create_warranty",
-  description: "Creates a warranty record",
-  inputSchema: CreateWarrantyArgsSchema.shape as any,
-};
-
-const updateWarrantyTool: Tool = {
-  name: "stateset_update_warranty",
-  description: "Updates a warranty record",
-  inputSchema: UpdateWarrantyArgsSchema.shape as any,
-};
-
-const createShipmentTool: Tool = {
-  name: "stateset_create_shipment",
-  description: "Creates a shipment record",
-  inputSchema: CreateShipmentArgsSchema.shape as any,
-};
-
-const updateShipmentTool: Tool = {
-  name: "stateset_update_shipment",
-  description: "Updates a shipment record",
-  inputSchema: UpdateShipmentArgsSchema.shape as any,
-};
-
-const createBillOfMaterialsTool: Tool = {
-  name: "stateset_create_bill_of_materials",
-  description: "Creates a bill of materials record",
-  inputSchema: CreateBillOfMaterialsArgsSchema.shape as any,
-};
-
-const updateBillOfMaterialsTool: Tool = {
-  name: "stateset_update_bill_of_materials",
-  description: "Updates a bill of materials record",
-  inputSchema: UpdateBillOfMaterialsArgsSchema.shape as any,
-};
-
-const createWorkOrderTool: Tool = {
-  name: "stateset_create_work_order",
-  description: "Creates a work order record",
-  inputSchema: CreateWorkOrderArgsSchema.shape as any,
-};
-
-const updateWorkOrderTool: Tool = {
-  name: "stateset_update_work_order",
-  description: "Updates a work order record",
-  inputSchema: UpdateWorkOrderArgsSchema.shape as any,
-};
-
-const createManufacturerOrderTool: Tool = {
-  name: "stateset_create_manufacturer_order",
-  description: "Creates a manufacturer order record",
-  inputSchema: CreateManufacturerOrderArgsSchema.shape as any,
-};
-
-const updateManufacturerOrderTool: Tool = {
-  name: "stateset_update_manufacturer_order",
-  description: "Updates a manufacturer order record",
-  inputSchema: UpdateManufacturerOrderArgsSchema.shape as any,
-};
-
-const createPurchaseOrderTool: Tool = {
-  name: "stateset_create_purchase_order",
-  description: "Creates a purchase order record",
-  inputSchema: CreatePurchaseOrderArgsSchema.shape as any,
-};
-
-const updatePurchaseOrderTool: Tool = {
-  name: "stateset_update_purchase_order",
-  description: "Updates a purchase order record",
-  inputSchema: UpdatePurchaseOrderArgsSchema.shape as any,
-};
-
-const deletePurchaseOrderTool: Tool = {
-  name: "stateset_delete_purchase_order",
-  description: "Deletes a purchase order record",
-  inputSchema: DeletePurchaseOrderArgsSchema.shape as any,
-};
-
-const getPurchaseOrderTool: Tool = {
-  name: "stateset_get_purchase_order",
-  description: "Retrieves a purchase order record",
-  inputSchema: GetPurchaseOrderArgsSchema.shape as any,
-};
-
-const listPurchaseOrdersTool: Tool = {
-  name: "stateset_list_purchase_orders",
-  description: "Lists purchase order records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const createASNTool: Tool = {
-  name: "stateset_create_asn",
-  description: "Creates an ASN record",
-  inputSchema: CreateASNArgsSchema.shape as any,
-};
-
-const updateASNTool: Tool = {
-  name: "stateset_update_asn",
-  description: "Updates an ASN record",
-  inputSchema: UpdateASNArgsSchema.shape as any,
-};
-
-const deleteASNTool: Tool = {
-  name: "stateset_delete_asn",
-  description: "Deletes an ASN record",
-  inputSchema: DeleteASNArgsSchema.shape as any,
-};
-
-const getASNTool: Tool = {
-  name: "stateset_get_asn",
-  description: "Retrieves an ASN record",
-  inputSchema: GetASNArgsSchema.shape as any,
-};
-
-const listASNsTool: Tool = {
-  name: "stateset_list_asns",
-  description: "Lists ASN records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const createInvoiceTool: Tool = {
-  name: "stateset_create_invoice",
-  description: "Creates an invoice record",
-  inputSchema: CreateInvoiceArgsSchema.shape as any,
-};
-
-const updateInvoiceTool: Tool = {
-  name: "stateset_update_invoice",
-  description: "Updates an invoice record",
-  inputSchema: UpdateInvoiceArgsSchema.shape as any,
-};
-
-const createPaymentTool: Tool = {
-  name: "stateset_create_payment",
-  description: "Creates a payment record",
-  inputSchema: CreatePaymentArgsSchema.shape as any,
-};
-
-const updatePaymentTool: Tool = {
-  name: "stateset_update_payment",
-  description: "Updates a payment record",
-  inputSchema: UpdatePaymentArgsSchema.shape as any,
-};
-
-const createSalesOrderTool: Tool = {
-  name: "stateset_create_sales_order",
-  description: "Creates a sales order record",
-  inputSchema: CreateSalesOrderArgsSchema.shape as any,
-};
-
-const updateSalesOrderTool: Tool = {
-  name: "stateset_update_sales_order",
-  description: "Updates a sales order record",
-  inputSchema: UpdateSalesOrderArgsSchema.shape as any,
-};
-
-const deleteSalesOrderTool: Tool = {
-  name: "stateset_delete_sales_order",
-  description: "Deletes a sales order record",
-  inputSchema: DeleteSalesOrderArgsSchema.shape as any,
-};
-
-const getSalesOrderTool: Tool = {
-  name: "stateset_get_sales_order",
-  description: "Retrieves a sales order record",
-  inputSchema: GetSalesOrderArgsSchema.shape as any,
-};
-
-const listSalesOrdersTool: Tool = {
-  name: "stateset_list_sales_orders",
-  description: "Lists sales order records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const createFulfillmentOrderTool: Tool = {
-  name: "stateset_create_fulfillment_order",
-  description: "Creates a fulfillment order record",
-  inputSchema: CreateFulfillmentOrderArgsSchema.shape as any,
-};
-
-const updateFulfillmentOrderTool: Tool = {
-  name: "stateset_update_fulfillment_order",
-  description: "Updates a fulfillment order record",
-  inputSchema: UpdateFulfillmentOrderArgsSchema.shape as any,
-};
-
-const deleteFulfillmentOrderTool: Tool = {
-  name: "stateset_delete_fulfillment_order",
-  description: "Deletes a fulfillment order record",
-  inputSchema: DeleteFulfillmentOrderArgsSchema.shape as any,
-};
-
-const getFulfillmentOrderTool: Tool = {
-  name: "stateset_get_fulfillment_order",
-  description: "Retrieves a fulfillment order record",
-  inputSchema: GetFulfillmentOrderArgsSchema.shape as any,
-};
-
-const listFulfillmentOrdersTool: Tool = {
-  name: "stateset_list_fulfillment_orders",
-  description: "Lists fulfillment order records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const createItemReceiptTool: Tool = {
-  name: "stateset_create_item_receipt",
-  description: "Creates an item receipt record",
-  inputSchema: CreateItemReceiptArgsSchema.shape as any,
-};
-
-const updateItemReceiptTool: Tool = {
-  name: "stateset_update_item_receipt",
-  description: "Updates an item receipt record",
-  inputSchema: UpdateItemReceiptArgsSchema.shape as any,
-};
-
-const deleteItemReceiptTool: Tool = {
-  name: "stateset_delete_item_receipt",
-  description: "Deletes an item receipt record",
-  inputSchema: DeleteItemReceiptArgsSchema.shape as any,
-};
-
-const getItemReceiptTool: Tool = {
-  name: "stateset_get_item_receipt",
-  description: "Retrieves an item receipt record",
-  inputSchema: GetItemReceiptArgsSchema.shape as any,
-};
-
-const listItemReceiptsTool: Tool = {
-  name: "stateset_list_item_receipts",
-  description: "Lists item receipt records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const createCashSaleTool: Tool = {
-  name: "stateset_create_cash_sale",
-  description: "Creates a cash sale record",
-  inputSchema: CreateCashSaleArgsSchema.shape as any,
-};
-
-const updateCashSaleTool: Tool = {
-  name: "stateset_update_cash_sale",
-  description: "Updates a cash sale record",
-  inputSchema: UpdateCashSaleArgsSchema.shape as any,
-};
-
-const deleteCashSaleTool: Tool = {
-  name: "stateset_delete_cash_sale",
-  description: "Deletes a cash sale record",
-  inputSchema: DeleteCashSaleArgsSchema.shape as any,
-};
-
-const getCashSaleTool: Tool = {
-  name: "stateset_get_cash_sale",
-  description: "Retrieves a cash sale record",
-  inputSchema: GetCashSaleArgsSchema.shape as any,
-};
-
-const listCashSalesTool: Tool = {
-  name: "stateset_list_cash_sales",
-  description: "Lists cash sale records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const createProductTool: Tool = {
-  name: "stateset_create_product",
-  description: "Creates a product record",
-  inputSchema: CreateProductArgsSchema.shape as any,
-};
-
-const updateProductTool: Tool = {
-  name: "stateset_update_product",
-  description: "Updates a product record",
-  inputSchema: UpdateProductArgsSchema.shape as any,
-};
-
-const createInventoryTool: Tool = {
-  name: "stateset_create_inventory",
-  description: "Creates an inventory record",
-  inputSchema: CreateInventoryArgsSchema.shape as any,
-};
-
-const updateInventoryTool: Tool = {
-  name: "stateset_update_inventory",
-  description: "Updates an inventory record",
-  inputSchema: UpdateInventoryArgsSchema.shape as any,
-};
-
-const createCustomerTool: Tool = {
-  name: "stateset_create_customer",
-  description: "Creates a customer record",
-  inputSchema: CreateCustomerArgsSchema.shape as any,
-};
-
-const updateCustomerTool: Tool = {
-  name: "stateset_update_customer",
-  description: "Updates a customer record",
-  inputSchema: UpdateCustomerArgsSchema.shape as any,
-};
-
-const deleteRMATool: Tool = {
-  name: "stateset_delete_rma",
-  description: "Deletes an RMA record",
-  inputSchema: DeleteRMAArgsSchema.shape as any,
-};
-
-const deleteOrderTool: Tool = {
-  name: "stateset_delete_order",
-  description: "Deletes an order record",
-  inputSchema: DeleteOrderArgsSchema.shape as any,
-};
-
-const deleteWarrantyTool: Tool = {
-  name: "stateset_delete_warranty",
-  description: "Deletes a warranty record",
-  inputSchema: DeleteWarrantyArgsSchema.shape as any,
-};
-
-const deleteShipmentTool: Tool = {
-  name: "stateset_delete_shipment",
-  description: "Deletes a shipment record",
-  inputSchema: DeleteShipmentArgsSchema.shape as any,
-};
-
-const deleteBillOfMaterialsTool: Tool = {
-  name: "stateset_delete_bill_of_materials",
-  description: "Deletes a bill of materials record",
-  inputSchema: DeleteBillOfMaterialsArgsSchema.shape as any,
-};
-
-const deleteWorkOrderTool: Tool = {
-  name: "stateset_delete_work_order",
-  description: "Deletes a work order record",
-  inputSchema: DeleteWorkOrderArgsSchema.shape as any,
-};
-
-const deleteManufacturerOrderTool: Tool = {
-  name: "stateset_delete_manufacturer_order",
-  description: "Deletes a manufacturer order record",
-  inputSchema: DeleteManufacturerOrderArgsSchema.shape as any,
-};
-
-const deleteInvoiceTool: Tool = {
-  name: "stateset_delete_invoice",
-  description: "Deletes an invoice record",
-  inputSchema: DeleteInvoiceArgsSchema.shape as any,
-};
-
-const deletePaymentTool: Tool = {
-  name: "stateset_delete_payment",
-  description: "Deletes a payment record",
-  inputSchema: DeletePaymentArgsSchema.shape as any,
-};
-
-const deleteProductTool: Tool = {
-  name: "stateset_delete_product",
-  description: "Deletes a product record",
-  inputSchema: DeleteProductArgsSchema.shape as any,
-};
-
-const deleteInventoryTool: Tool = {
-  name: "stateset_delete_inventory",
-  description: "Deletes an inventory record",
-  inputSchema: DeleteInventoryArgsSchema.shape as any,
-};
-
-const deleteCustomerTool: Tool = {
-  name: "stateset_delete_customer",
-  description: "Deletes a customer record",
-  inputSchema: DeleteCustomerArgsSchema.shape as any,
-};
-
-const getRMATool: Tool = {
-  name: "stateset_get_rma",
-  description: "Retrieves an RMA record",
-  inputSchema: GetRMAArgsSchema.shape as any,
-};
-
-const getOrderTool: Tool = {
-  name: "stateset_get_order",
-  description: "Retrieves an order record",
-  inputSchema: GetOrderArgsSchema.shape as any,
-};
-
-const getWarrantyTool: Tool = {
-  name: "stateset_get_warranty",
-  description: "Retrieves a warranty record",
-  inputSchema: GetWarrantyArgsSchema.shape as any,
-};
-
-const getShipmentTool: Tool = {
-  name: "stateset_get_shipment",
-  description: "Retrieves a shipment record",
-  inputSchema: GetShipmentArgsSchema.shape as any,
-};
-
-const getBillOfMaterialsTool: Tool = {
-  name: "stateset_get_bill_of_materials",
-  description: "Retrieves a bill of materials record",
-  inputSchema: GetBillOfMaterialsArgsSchema.shape as any,
-};
-
-const getWorkOrderTool: Tool = {
-  name: "stateset_get_work_order",
-  description: "Retrieves a work order record",
-  inputSchema: GetWorkOrderArgsSchema.shape as any,
-};
-
-const getManufacturerOrderTool: Tool = {
-  name: "stateset_get_manufacturer_order",
-  description: "Retrieves a manufacturer order record",
-  inputSchema: GetManufacturerOrderArgsSchema.shape as any,
-};
-
-const getInvoiceTool: Tool = {
-  name: "stateset_get_invoice",
-  description: "Retrieves an invoice record",
-  inputSchema: GetInvoiceArgsSchema.shape as any,
-};
-
-const getPaymentTool: Tool = {
-  name: "stateset_get_payment",
-  description: "Retrieves a payment record",
-  inputSchema: GetPaymentArgsSchema.shape as any,
-};
-
-const getProductTool: Tool = {
-  name: "stateset_get_product",
-  description: "Retrieves a product record",
-  inputSchema: GetProductArgsSchema.shape as any,
-};
-
-const getInventoryTool: Tool = {
-  name: "stateset_get_inventory",
-  description: "Retrieves an inventory record",
-  inputSchema: GetInventoryArgsSchema.shape as any,
-};
-
-const getCustomerTool: Tool = {
-  name: "stateset_get_customer",
-  description: "Retrieves a customer record",
-  inputSchema: GetCustomerArgsSchema.shape as any,
-};
-
-const listRMAsTool: Tool = {
-  name: "stateset_list_rmas",
-  description: "Lists RMA records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const listOrdersTool: Tool = {
-  name: "stateset_list_orders",
-  description: "Lists order records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const listWarrantiesTool: Tool = {
-  name: "stateset_list_warranties",
-  description: "Lists warranty records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const listShipmentsTool: Tool = {
-  name: "stateset_list_shipments",
-  description: "Lists shipment records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const listBillOfMaterialsTool: Tool = {
-  name: "stateset_list_bill_of_materials",
-  description: "Lists bill of materials records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const listWorkOrdersTool: Tool = {
-  name: "stateset_list_work_orders",
-  description: "Lists work order records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const listManufacturerOrdersTool: Tool = {
-  name: "stateset_list_manufacturer_orders",
-  description: "Lists manufacturer order records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const listInvoicesTool: Tool = {
-  name: "stateset_list_invoices",
-  description: "Lists invoice records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const listPaymentsTool: Tool = {
-  name: "stateset_list_payments",
-  description: "Lists payment records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const listProductsTool: Tool = {
-  name: "stateset_list_products",
-  description: "Lists product records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const listInventoriesTool: Tool = {
-  name: "stateset_list_inventories",
-  description: "Lists inventory records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const listCustomersTool: Tool = {
-  name: "stateset_list_customers",
-  description: "Lists customer records",
-  inputSchema: ListArgsSchema.shape as any,
-};
-
-const getApiMetricsTool: Tool = {
-  name: "stateset_get_api_metrics",
-  description: "Returns API rate limiter metrics",
-  inputSchema: GetApiMetricsArgsSchema.shape as any,
-};
-
-
-// Resource Templates
-const resourceTemplates: ResourceTemplate[] = [
-  {
-    uriTemplate: "stateset-rma:///{rmaId}",
-    name: "StateSet RMA",
-    description: "RMA record",
-    parameters: { rmaId: { type: "string", description: "RMA ID" } },
-    examples: ["stateset-rma:///12345"],
-  },
-  {
-    uriTemplate: "stateset-order:///{orderId}",
-    name: "StateSet Order",
-    description: "Order record",
-    parameters: { orderId: { type: "string", description: "Order ID" } },
-    examples: ["stateset-order:///ORD-123"],
-  },
-  {
-    uriTemplate: "stateset-warranty:///{warrantyId}",
-    name: "StateSet Warranty",
-    description: "Warranty record",
-    parameters: { warrantyId: { type: "string", description: "Warranty ID" } },
-    examples: ["stateset-warranty:///WAR-123"],
-  },
-  {
-    uriTemplate: "stateset-shipment:///{shipmentId}",
-    name: "StateSet Shipment",
-    description: "Shipment record",
-    parameters: { shipmentId: { type: "string", description: "Shipment ID" } },
-    examples: ["stateset-shipment:///SHIP-123"],
-  },
-  {
-    uriTemplate: "stateset-bill-of-materials:///{billOfMaterialsId}",
-    name: "StateSet Bill of Materials",
-    description: "Bill of Materials record",
-    parameters: { billOfMaterialsId: { type: "string", description: "Bill of Materials ID" } },
-    examples: ["stateset-bill-of-materials:///BOM-123"],
-  },
-  {
-    uriTemplate: "stateset-work-order:///{workOrderId}",
-    name: "StateSet Work Order",
-    description: "Work Order record",
-    parameters: { workOrderId: { type: "string", description: "Work Order ID" } },
-    examples: ["stateset-work-order:///WO-123"],
-  },
-  {
-    uriTemplate: "stateset-manufacturer-order:///{manufacturerOrderId}",
-    name: "StateSet Manufacturer Order",
-    description: "Manufacturer Order record",
-    parameters: { manufacturerOrderId: { type: "string", description: "Manufacturer Order ID" } },
-    examples: ["stateset-manufacturer-order:///MO-123"],
-  },
-  {
-    uriTemplate: "stateset-purchase-order:///{purchaseOrderId}",
-    name: "StateSet Purchase Order",
-    description: "Purchase Order record",
-    parameters: { purchaseOrderId: { type: "string", description: "Purchase Order ID" } },
-    examples: ["stateset-purchase-order:///PO-123"],
-  },
-  {
-    uriTemplate: "stateset-asn:///{asnId}",
-    name: "StateSet ASN",
-    description: "Advanced Shipping Notice record",
-    parameters: { asnId: { type: "string", description: "ASN ID" } },
-    examples: ["stateset-asn:///ASN-123"],
-  },
-  {
-    uriTemplate: "stateset-invoice:///{invoiceId}",
-    name: "StateSet Invoice",
-    description: "Invoice record",
-    parameters: { invoiceId: { type: "string", description: "Invoice ID" } },
-    examples: ["stateset-invoice:///INV-123"],
-  },
-  {
-    uriTemplate: "stateset-payment:///{paymentId}",
-    name: "StateSet Payment",
-    description: "Payment record",
-    parameters: { paymentId: { type: "string", description: "Payment ID" } },
-    examples: ["stateset-payment:///PAY-123"],
-  },
-  {
-    uriTemplate: "stateset-sales-order:///{salesOrderId}",
-    name: "StateSet Sales Order",
-    description: "Sales Order record",
-    parameters: { salesOrderId: { type: "string", description: "Sales Order ID" } },
-    examples: ["stateset-sales-order:///SO-123"],
-  },
-  {
-    uriTemplate: "stateset-fulfillment-order:///{fulfillmentOrderId}",
-    name: "StateSet Fulfillment Order",
-    description: "Fulfillment Order record",
-    parameters: { fulfillmentOrderId: { type: "string", description: "Fulfillment Order ID" } },
-    examples: ["stateset-fulfillment-order:///FO-123"],
-  },
-  {
-    uriTemplate: "stateset-item-receipt:///{itemReceiptId}",
-    name: "StateSet Item Receipt",
-    description: "Item Receipt record",
-    parameters: { itemReceiptId: { type: "string", description: "Item Receipt ID" } },
-    examples: ["stateset-item-receipt:///IR-123"],
-  },
-  {
-    uriTemplate: "stateset-cash-sale:///{cashSaleId}",
-    name: "StateSet Cash Sale",
-    description: "Cash Sale record",
-    parameters: { cashSaleId: { type: "string", description: "Cash Sale ID" } },
-    examples: ["stateset-cash-sale:///CS-123"],
-  },
-  {
-    uriTemplate: "stateset-product:///{productId}",
-    name: "StateSet Product",
-    description: "Product record",
-    parameters: { productId: { type: "string", description: "Product ID" } },
-    examples: ["stateset-product:///PROD-123"],
-  },
-  {
-    uriTemplate: "stateset-inventory:///{inventoryId}",
-    name: "StateSet Inventory",
-    description: "Inventory record",
-    parameters: { inventoryId: { type: "string", description: "Inventory ID" } },
-    examples: ["stateset-inventory:///INV-123"],
-  },
-  {
-    uriTemplate: "stateset-customer:///{customerId}",
-    name: "StateSet Customer",
-    description: "Customer record",
-    parameters: { customerId: { type: "string", description: "Customer ID" } },
-    examples: ["stateset-customer:///CUST-123"],
-  },
-];
-
-// Server Prompt
-const serverPrompt: Prompt = {
-  name: "stateset-server-prompt",
-  description: "StateSet MCP server instructions",
-  instructions: `Manages eCommerce operations for StateSet.
-
-Capabilities are grouped by domain:
-
-Orders & Returns
-- stateset_create_order / stateset_update_order / stateset_delete_order / stateset_get_order
-- stateset_create_sales_order / stateset_update_sales_order / stateset_delete_sales_order / stateset_get_sales_order
-- stateset_create_rma / stateset_update_rma / stateset_delete_rma / stateset_get_rma
-
-Fulfillment & Production
-- stateset_create_shipment / stateset_update_shipment / stateset_delete_shipment / stateset_get_shipment
-- stateset_create_fulfillment_order / stateset_update_fulfillment_order / stateset_delete_fulfillment_order / stateset_get_fulfillment_order
-- stateset_create_item_receipt / stateset_update_item_receipt / stateset_delete_item_receipt / stateset_get_item_receipt
-- stateset_create_bill_of_materials / stateset_update_bill_of_materials / stateset_delete_bill_of_materials / stateset_get_bill_of_materials
-- stateset_create_work_order / stateset_update_work_order / stateset_delete_work_order / stateset_get_work_order
-- stateset_create_manufacturer_order / stateset_update_manufacturer_order / stateset_delete_manufacturer_order / stateset_get_manufacturer_order
-
-Inventory & Products
-- stateset_create_product / stateset_update_product / stateset_delete_product / stateset_get_product
-- stateset_create_inventory / stateset_update_inventory / stateset_delete_inventory / stateset_get_inventory
-
-Financial
-- stateset_create_invoice / stateset_update_invoice / stateset_delete_invoice / stateset_get_invoice
-- stateset_create_payment / stateset_update_payment / stateset_delete_payment / stateset_get_payment
-- stateset_create_cash_sale / stateset_update_cash_sale / stateset_delete_cash_sale / stateset_get_cash_sale
-
-Customers
-- stateset_create_customer / stateset_update_customer / stateset_delete_customer / stateset_get_customer
-
-Listing
-- stateset_list_rmas / stateset_list_orders / stateset_list_sales_orders / stateset_list_warranties
-- stateset_list_shipments / stateset_list_fulfillment_orders / stateset_list_item_receipts / stateset_list_cash_sales
-- stateset_list_bill_of_materials / stateset_list_work_orders / stateset_list_manufacturer_orders
-- stateset_list_invoices / stateset_list_payments / stateset_list_products / stateset_list_inventories / stateset_list_customers
-
-Best practices:
-- Validate all IDs before use
-- Include detailed notes
-- Update statuses promptly`
-};
+// Real-time update broadcaster
+function broadcastResourceUpdate(
+  resourceType: string,
+  resourceId: string,
+  action: 'created' | 'updated' | 'deleted',
+  data: any
+): void {
+  // Broadcast to resource-specific channel (e.g., "orders" or "orders:123")
+  wsManager.broadcast(resourceType, {
+    action,
+    resourceId,
+    data,
+    timestamp: new Date().toISOString(),
+  });
+
+  // Also broadcast to the specific resource channel
+  wsManager.broadcast(`${resourceType}:${resourceId}`, {
+    action,
+    resourceId,
+    data,
+    timestamp: new Date().toISOString(),
+  });
+
+  logger.debug('Real-time update broadcasted', {
+    resourceType,
+    resourceId,
+    action,
+  });
+}
 
 // Main Function
 async function main(): Promise<void> {
@@ -2819,6 +1936,7 @@ async function main(): Promise<void> {
       STATESET_BASE_URL: z.string().url().default('https://api.stateset.io/v1'),
       REQUESTS_PER_HOUR: z.coerce.number().positive().default(1000),
       API_TIMEOUT_MS: z.coerce.number().positive().default(10000),
+      WEBSOCKET_PORT: z.coerce.number().positive().default(8081),
     }).parse(process.env);
 
     const config: Config = {
@@ -2829,6 +1947,17 @@ async function main(): Promise<void> {
     };
 
     const client = new StateSetMCPClient(config);
+
+    // Start WebSocket server for real-time updates
+    try {
+      wsManager.start(env.WEBSOCKET_PORT);
+      logger.info('WebSocket server started', { port: env.WEBSOCKET_PORT });
+    } catch (wsError) {
+      logger.warn('Failed to start WebSocket server - real-time updates will be unavailable', {
+        error: wsError instanceof Error ? wsError.message : String(wsError),
+      });
+    }
+
     const server = new Server(
       { name: "stateset-mcp-server", version: "1.0.0" },
       {
@@ -2840,199 +1969,610 @@ async function main(): Promise<void> {
       }
     );
 
-    server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest) => {
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const startTime = Date.now();
+
+      // Log incoming request
+      logger.debug('Tool request received', {
+        requestId,
+        tool: request.params.name,
+        hasArguments: !!request.params.arguments,
+      });
+
       try {
-        switch (request.params.name) {
-          case "stateset_create_rma":
-            return await client.createRMA(CreateRMAArgsSchema.parse(request.params.arguments));
-          case "stateset_update_rma":
-            return await client.updateRMA(UpdateRMAArgsSchema.parse(request.params.arguments));
-          case "stateset_create_order":
-            return await client.createOrder(CreateOrderArgsSchema.parse(request.params.arguments));
-          case "stateset_update_order":
-            return await client.updateOrder(UpdateOrderArgsSchema.parse(request.params.arguments));
+        // Sanitize input arguments for security
+        const rawArgs = request.params.arguments || {};
+        const sanitizedArgs = sanitizeToolArguments(rawArgs as Record<string, unknown>, request.params.name);
+
+        // Create a modified request with sanitized arguments
+        const safeRequest = {
+          ...request,
+          params: {
+            ...request.params,
+            arguments: sanitizedArgs,
+          },
+        };
+
+        // Apply per-tool rate limiting
+        const toolCategory = await toolRateLimiter.waitAndAcquire(safeRequest.params.name);
+        logger.debug('Tool rate limit acquired', {
+          requestId,
+          tool: safeRequest.params.name,
+          category: toolCategory,
+        });
+
+        switch (safeRequest.params.name) {
+          case "stateset_create_rma": {
+            const result = await client.createRMA(schemas.CreateRMAArgsSchema.parse(safeRequest.params.arguments) as any);
+            broadcastResourceUpdate('rmas', result.id, 'created', result);
+            return result;
+          }
+          case "stateset_update_rma": {
+            const args = schemas.UpdateRMAArgsSchema.parse(safeRequest.params.arguments) as any;
+            const result = await client.updateRMA(args);
+            broadcastResourceUpdate('rmas', args.rma_id, 'updated', result);
+            return result;
+          }
+          case "stateset_create_order": {
+            const result = await client.createOrder(schemas.CreateOrderArgsSchema.parse(safeRequest.params.arguments) as any);
+            broadcastResourceUpdate('orders', result.id, 'created', result);
+            return result;
+          }
+          case "stateset_update_order": {
+            const args = schemas.UpdateOrderArgsSchema.parse(safeRequest.params.arguments) as any;
+            const result = await client.updateOrder(args);
+            broadcastResourceUpdate('orders', args.order_id, 'updated', result);
+            return result;
+          }
           case "stateset_create_warranty":
-            return await client.createWarranty(CreateWarrantyArgsSchema.parse(request.params.arguments));
+            return await client.createWarranty(schemas.CreateWarrantyArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_update_warranty":
-            return await client.updateWarranty(UpdateWarrantyArgsSchema.parse(request.params.arguments));
-          case "stateset_create_shipment":
-            return await client.createShipment(CreateShipmentArgsSchema.parse(request.params.arguments));
-          case "stateset_update_shipment":
-            return await client.updateShipment(UpdateShipmentArgsSchema.parse(request.params.arguments));
+            return await client.updateWarranty(schemas.UpdateWarrantyArgsSchema.parse(safeRequest.params.arguments) as any);
+          case "stateset_create_shipment": {
+            const result = await client.createShipment(schemas.CreateShipmentArgsSchema.parse(safeRequest.params.arguments) as any);
+            broadcastResourceUpdate('shipments', result.id, 'created', result);
+            return result;
+          }
+          case "stateset_update_shipment": {
+            const args = schemas.UpdateShipmentArgsSchema.parse(safeRequest.params.arguments) as any;
+            const result = await client.updateShipment(args);
+            broadcastResourceUpdate('shipments', args.shipment_id, 'updated', result);
+            return result;
+          }
           case "stateset_create_bill_of_materials":
-            return await client.createBillOfMaterials(CreateBillOfMaterialsArgsSchema.parse(request.params.arguments));
+            return await client.createBillOfMaterials(schemas.CreateBillOfMaterialsArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_update_bill_of_materials":
-            return await client.updateBillOfMaterials(UpdateBillOfMaterialsArgsSchema.parse(request.params.arguments));
+            return await client.updateBillOfMaterials(schemas.UpdateBillOfMaterialsArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_create_work_order":
-            return await client.createWorkOrder(CreateWorkOrderArgsSchema.parse(request.params.arguments));
+            return await client.createWorkOrder(schemas.CreateWorkOrderArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_update_work_order":
-            return await client.updateWorkOrder(UpdateWorkOrderArgsSchema.parse(request.params.arguments));
+            return await client.updateWorkOrder(schemas.UpdateWorkOrderArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_create_manufacturer_order":
-            return await client.createManufacturerOrder(CreateManufacturerOrderArgsSchema.parse(request.params.arguments));
+            return await client.createManufacturerOrder(schemas.CreateManufacturerOrderArgsSchema.parse(safeRequest.params.arguments) as any);
         case "stateset_update_manufacturer_order":
-          return await client.updateManufacturerOrder(UpdateManufacturerOrderArgsSchema.parse(request.params.arguments));
+          return await client.updateManufacturerOrder(schemas.UpdateManufacturerOrderArgsSchema.parse(safeRequest.params.arguments) as any);
         case "stateset_create_purchase_order":
-          return await client.createPurchaseOrder(CreatePurchaseOrderArgsSchema.parse(request.params.arguments));
+          return await client.createPurchaseOrder(schemas.CreatePurchaseOrderArgsSchema.parse(safeRequest.params.arguments) as any);
         case "stateset_update_purchase_order":
-          return await client.updatePurchaseOrder(UpdatePurchaseOrderArgsSchema.parse(request.params.arguments));
+          return await client.updatePurchaseOrder(schemas.UpdatePurchaseOrderArgsSchema.parse(safeRequest.params.arguments) as any);
         case "stateset_delete_purchase_order":
-          return await client.deletePurchaseOrder(DeletePurchaseOrderArgsSchema.parse(request.params.arguments));
+          return await client.deletePurchaseOrder(schemas.DeletePurchaseOrderArgsSchema.parse(safeRequest.params.arguments) as any);
         case "stateset_get_purchase_order":
-          return await client.getPurchaseOrder(GetPurchaseOrderArgsSchema.parse(request.params.arguments).purchase_order_id);
+          return await client.getPurchaseOrder(schemas.GetPurchaseOrderArgsSchema.parse(safeRequest.params.arguments).purchase_order_id);
         case "stateset_list_purchase_orders":
-          return await client.listPurchaseOrders(ListArgsSchema.parse(request.params.arguments));
+          return await client.listPurchaseOrders(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
         case "stateset_create_asn":
-          return await client.createASN(CreateASNArgsSchema.parse(request.params.arguments));
+          return await client.createASN(schemas.CreateASNArgsSchema.parse(safeRequest.params.arguments) as any);
         case "stateset_update_asn":
-          return await client.updateASN(UpdateASNArgsSchema.parse(request.params.arguments));
+          return await client.updateASN(schemas.UpdateASNArgsSchema.parse(safeRequest.params.arguments) as any);
         case "stateset_delete_asn":
-          return await client.deleteASN(DeleteASNArgsSchema.parse(request.params.arguments));
+          return await client.deleteASN(schemas.DeleteASNArgsSchema.parse(safeRequest.params.arguments) as any);
         case "stateset_get_asn":
-          return await client.getASN(GetASNArgsSchema.parse(request.params.arguments).asn_id);
+          return await client.getASN(schemas.GetASNArgsSchema.parse(safeRequest.params.arguments).asn_id);
         case "stateset_list_asns":
-          return await client.listASNs(ListArgsSchema.parse(request.params.arguments));
+          return await client.listASNs(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
         case "stateset_create_invoice":
-          return await client.createInvoice(CreateInvoiceArgsSchema.parse(request.params.arguments));
+          return await client.createInvoice(schemas.CreateInvoiceArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_update_invoice":
-            return await client.updateInvoice(UpdateInvoiceArgsSchema.parse(request.params.arguments));
+            return await client.updateInvoice(schemas.UpdateInvoiceArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_create_payment":
-            return await client.createPayment(CreatePaymentArgsSchema.parse(request.params.arguments));
+            return await client.createPayment(schemas.CreatePaymentArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_update_payment":
-            return await client.updatePayment(UpdatePaymentArgsSchema.parse(request.params.arguments));
+            return await client.updatePayment(schemas.UpdatePaymentArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_create_sales_order":
-            return await client.createSalesOrder(CreateSalesOrderArgsSchema.parse(request.params.arguments));
+            return await client.createSalesOrder(schemas.CreateSalesOrderArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_update_sales_order":
-            return await client.updateSalesOrder(UpdateSalesOrderArgsSchema.parse(request.params.arguments));
+            return await client.updateSalesOrder(schemas.UpdateSalesOrderArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_create_fulfillment_order":
-            return await client.createFulfillmentOrder(CreateFulfillmentOrderArgsSchema.parse(request.params.arguments));
+            return await client.createFulfillmentOrder(schemas.CreateFulfillmentOrderArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_update_fulfillment_order":
-            return await client.updateFulfillmentOrder(UpdateFulfillmentOrderArgsSchema.parse(request.params.arguments));
+            return await client.updateFulfillmentOrder(schemas.UpdateFulfillmentOrderArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_create_item_receipt":
-            return await client.createItemReceipt(CreateItemReceiptArgsSchema.parse(request.params.arguments));
+            return await client.createItemReceipt(schemas.CreateItemReceiptArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_update_item_receipt":
-            return await client.updateItemReceipt(UpdateItemReceiptArgsSchema.parse(request.params.arguments));
+            return await client.updateItemReceipt(schemas.UpdateItemReceiptArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_create_cash_sale":
-            return await client.createCashSale(CreateCashSaleArgsSchema.parse(request.params.arguments));
+            return await client.createCashSale(schemas.CreateCashSaleArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_update_cash_sale":
-            return await client.updateCashSale(UpdateCashSaleArgsSchema.parse(request.params.arguments));
+            return await client.updateCashSale(schemas.UpdateCashSaleArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_create_product":
-            return await client.createProduct(CreateProductArgsSchema.parse(request.params.arguments));
+            return await client.createProduct(schemas.CreateProductArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_update_product":
-            return await client.updateProduct(UpdateProductArgsSchema.parse(request.params.arguments));
+            return await client.updateProduct(schemas.UpdateProductArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_create_inventory":
-            return await client.createInventory(CreateInventoryArgsSchema.parse(request.params.arguments));
+            return await client.createInventory(schemas.CreateInventoryArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_update_inventory":
-            return await client.updateInventory(UpdateInventoryArgsSchema.parse(request.params.arguments));
+            return await client.updateInventory(schemas.UpdateInventoryArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_create_customer":
-            return await client.createCustomer(CreateCustomerArgsSchema.parse(request.params.arguments));
+            return await client.createCustomer(schemas.CreateCustomerArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_update_customer":
-            return await client.updateCustomer(UpdateCustomerArgsSchema.parse(request.params.arguments));
+            return await client.updateCustomer(schemas.UpdateCustomerArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_rma":
-            return await client.deleteRMA(DeleteRMAArgsSchema.parse(request.params.arguments));
-          case "stateset_delete_order":
-            return await client.deleteOrder(DeleteOrderArgsSchema.parse(request.params.arguments));
+            return await client.deleteRMA(schemas.DeleteRMAArgsSchema.parse(safeRequest.params.arguments) as any);
+          case "stateset_delete_order": {
+            const args = schemas.DeleteOrderArgsSchema.parse(safeRequest.params.arguments) as any;
+            const result = await client.deleteOrder(args);
+            broadcastResourceUpdate('orders', args.order_id, 'deleted', { id: args.order_id });
+            return result;
+          }
           case "stateset_delete_sales_order":
-            return await client.deleteSalesOrder(DeleteSalesOrderArgsSchema.parse(request.params.arguments));
+            return await client.deleteSalesOrder(schemas.DeleteSalesOrderArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_warranty":
-            return await client.deleteWarranty(DeleteWarrantyArgsSchema.parse(request.params.arguments));
+            return await client.deleteWarranty(schemas.DeleteWarrantyArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_shipment":
-            return await client.deleteShipment(DeleteShipmentArgsSchema.parse(request.params.arguments));
+            return await client.deleteShipment(schemas.DeleteShipmentArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_bill_of_materials":
-            return await client.deleteBillOfMaterials(DeleteBillOfMaterialsArgsSchema.parse(request.params.arguments));
+            return await client.deleteBillOfMaterials(schemas.DeleteBillOfMaterialsArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_work_order":
-            return await client.deleteWorkOrder(DeleteWorkOrderArgsSchema.parse(request.params.arguments));
+            return await client.deleteWorkOrder(schemas.DeleteWorkOrderArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_manufacturer_order":
-            return await client.deleteManufacturerOrder(DeleteManufacturerOrderArgsSchema.parse(request.params.arguments));
+            return await client.deleteManufacturerOrder(schemas.DeleteManufacturerOrderArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_invoice":
-            return await client.deleteInvoice(DeleteInvoiceArgsSchema.parse(request.params.arguments));
+            return await client.deleteInvoice(schemas.DeleteInvoiceArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_payment":
-            return await client.deletePayment(DeletePaymentArgsSchema.parse(request.params.arguments));
+            return await client.deletePayment(schemas.DeletePaymentArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_fulfillment_order":
-            return await client.deleteFulfillmentOrder(DeleteFulfillmentOrderArgsSchema.parse(request.params.arguments));
+            return await client.deleteFulfillmentOrder(schemas.DeleteFulfillmentOrderArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_item_receipt":
-            return await client.deleteItemReceipt(DeleteItemReceiptArgsSchema.parse(request.params.arguments));
+            return await client.deleteItemReceipt(schemas.DeleteItemReceiptArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_cash_sale":
-            return await client.deleteCashSale(DeleteCashSaleArgsSchema.parse(request.params.arguments));
+            return await client.deleteCashSale(schemas.DeleteCashSaleArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_product":
-            return await client.deleteProduct(DeleteProductArgsSchema.parse(request.params.arguments));
+            return await client.deleteProduct(schemas.DeleteProductArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_inventory":
-            return await client.deleteInventory(DeleteInventoryArgsSchema.parse(request.params.arguments));
+            return await client.deleteInventory(schemas.DeleteInventoryArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_delete_customer":
-            return await client.deleteCustomer(DeleteCustomerArgsSchema.parse(request.params.arguments));
+            return await client.deleteCustomer(schemas.DeleteCustomerArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_get_rma":
-            return await client.getRMA(GetRMAArgsSchema.parse(request.params.arguments).rma_id);
+            return await client.getRMA(schemas.GetRMAArgsSchema.parse(safeRequest.params.arguments).rma_id);
           case "stateset_get_order":
-            return await client.getOrder(GetOrderArgsSchema.parse(request.params.arguments).order_id);
+            return await client.getOrder(schemas.GetOrderArgsSchema.parse(safeRequest.params.arguments).order_id);
           case "stateset_get_warranty":
-            return await client.getWarranty(GetWarrantyArgsSchema.parse(request.params.arguments).warranty_id);
+            return await client.getWarranty(schemas.GetWarrantyArgsSchema.parse(safeRequest.params.arguments).warranty_id);
           case "stateset_get_shipment":
-            return await client.getShipment(GetShipmentArgsSchema.parse(request.params.arguments).shipment_id);
+            return await client.getShipment(schemas.GetShipmentArgsSchema.parse(safeRequest.params.arguments).shipment_id);
           case "stateset_get_bill_of_materials":
-            return await client.getBillOfMaterials(GetBillOfMaterialsArgsSchema.parse(request.params.arguments).bill_of_materials_id);
+            return await client.getBillOfMaterials(schemas.GetBillOfMaterialsArgsSchema.parse(safeRequest.params.arguments).bill_of_materials_id);
           case "stateset_get_work_order":
-            return await client.getWorkOrder(GetWorkOrderArgsSchema.parse(request.params.arguments).work_order_id);
+            return await client.getWorkOrder(schemas.GetWorkOrderArgsSchema.parse(safeRequest.params.arguments).work_order_id);
           case "stateset_get_manufacturer_order":
-            return await client.getManufacturerOrder(GetManufacturerOrderArgsSchema.parse(request.params.arguments).manufacturer_order_id);
+            return await client.getManufacturerOrder(schemas.GetManufacturerOrderArgsSchema.parse(safeRequest.params.arguments).manufacturer_order_id);
           case "stateset_get_invoice":
-            return await client.getInvoice(GetInvoiceArgsSchema.parse(request.params.arguments).invoice_id);
+            return await client.getInvoice(schemas.GetInvoiceArgsSchema.parse(safeRequest.params.arguments).invoice_id);
           case "stateset_get_payment":
-            return await client.getPayment(GetPaymentArgsSchema.parse(request.params.arguments).payment_id);
+            return await client.getPayment(schemas.GetPaymentArgsSchema.parse(safeRequest.params.arguments).payment_id);
           case "stateset_get_sales_order":
-            return await client.getSalesOrder(GetSalesOrderArgsSchema.parse(request.params.arguments).sales_order_id);
+            return await client.getSalesOrder(schemas.GetSalesOrderArgsSchema.parse(safeRequest.params.arguments).sales_order_id);
           case "stateset_get_fulfillment_order":
-            return await client.getFulfillmentOrder(GetFulfillmentOrderArgsSchema.parse(request.params.arguments).fulfillment_order_id);
+            return await client.getFulfillmentOrder(schemas.GetFulfillmentOrderArgsSchema.parse(safeRequest.params.arguments).fulfillment_order_id);
           case "stateset_get_item_receipt":
-            return await client.getItemReceipt(GetItemReceiptArgsSchema.parse(request.params.arguments).item_receipt_id);
+            return await client.getItemReceipt(schemas.GetItemReceiptArgsSchema.parse(safeRequest.params.arguments).item_receipt_id);
           case "stateset_get_cash_sale":
-            return await client.getCashSale(GetCashSaleArgsSchema.parse(request.params.arguments).cash_sale_id);
+            return await client.getCashSale(schemas.GetCashSaleArgsSchema.parse(safeRequest.params.arguments).cash_sale_id);
           case "stateset_get_product":
-            return await client.getProduct(GetProductArgsSchema.parse(request.params.arguments).product_id);
+            return await client.getProduct(schemas.GetProductArgsSchema.parse(safeRequest.params.arguments).product_id);
           case "stateset_get_inventory":
-            return await client.getInventory(GetInventoryArgsSchema.parse(request.params.arguments).inventory_id);
+            return await client.getInventory(schemas.GetInventoryArgsSchema.parse(safeRequest.params.arguments).inventory_id);
           case "stateset_get_customer":
-            return await client.getCustomer(GetCustomerArgsSchema.parse(request.params.arguments).customer_id);
+            return await client.getCustomer(schemas.GetCustomerArgsSchema.parse(safeRequest.params.arguments).customer_id);
 
           case "stateset_list_rmas":
-            return await client.listRMAs(ListArgsSchema.parse(request.params.arguments));
+            return await client.listRMAs(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_orders":
-            return await client.listOrders(ListArgsSchema.parse(request.params.arguments));
+            return await client.listOrders(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_sales_orders":
-            return await client.listSalesOrders(ListArgsSchema.parse(request.params.arguments));
+            return await client.listSalesOrders(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_warranties":
-            return await client.listWarranties(ListArgsSchema.parse(request.params.arguments));
+            return await client.listWarranties(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_shipments":
-            return await client.listShipments(ListArgsSchema.parse(request.params.arguments));
+            return await client.listShipments(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_fulfillment_orders":
-            return await client.listFulfillmentOrders(ListArgsSchema.parse(request.params.arguments));
+            return await client.listFulfillmentOrders(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_item_receipts":
-            return await client.listItemReceipts(ListArgsSchema.parse(request.params.arguments));
+            return await client.listItemReceipts(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_cash_sales":
-            return await client.listCashSales(ListArgsSchema.parse(request.params.arguments));
+            return await client.listCashSales(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_bill_of_materials":
-            return await client.listBillOfMaterials(ListArgsSchema.parse(request.params.arguments));
+            return await client.listBillOfMaterials(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_work_orders":
-            return await client.listWorkOrders(ListArgsSchema.parse(request.params.arguments));
+            return await client.listWorkOrders(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_manufacturer_orders":
-            return await client.listManufacturerOrders(ListArgsSchema.parse(request.params.arguments));
+            return await client.listManufacturerOrders(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_invoices":
-            return await client.listInvoices(ListArgsSchema.parse(request.params.arguments));
+            return await client.listInvoices(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_payments":
-            return await client.listPayments(ListArgsSchema.parse(request.params.arguments));
+            return await client.listPayments(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_products":
-            return await client.listProducts(ListArgsSchema.parse(request.params.arguments));
+            return await client.listProducts(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_inventories":
-            return await client.listInventories(ListArgsSchema.parse(request.params.arguments));
+            return await client.listInventories(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_list_customers":
-            return await client.listCustomers(ListArgsSchema.parse(request.params.arguments));
+            return await client.listCustomers(schemas.ListArgsSchema.parse(safeRequest.params.arguments) as any);
           case "stateset_get_api_metrics":
             return client.getApiMetrics();
+
+          case "stateset_tool_rate_limits": {
+            const args = safeRequest.params.arguments as { category?: string };
+            const metrics = args.category
+              ? toolRateLimiter.getMetrics(args.category as any)
+              : toolRateLimiter.getMetrics();
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify({
+                  metrics,
+                  limits: toolRateLimiter.getLimits(),
+                  description: "Per-tool rate limits by category. Tokens refill continuously based on requestsPerMinute.",
+                }, null, 2),
+              }],
+            };
+          }
+
+          case "stateset_timeout_config": {
+            const timeouts = client.getTimeoutConfig();
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify({
+                  timeouts,
+                  description: "Per-operation timeout configuration in milliseconds. Batch operations have longest timeouts, read operations have shortest.",
+                  examples: {
+                    "getOrder (read)": `${timeouts.read}ms`,
+                    "createOrder (create)": `${timeouts.create}ms`,
+                    "batchCreateOrders (batch)": `${timeouts.batch}ms`,
+                    "searchOrders (search)": `${timeouts.search}ms`,
+                  },
+                }, null, 2),
+              }],
+            };
+          }
+
+          case "stateset_health_check": {
+            const args = safeRequest.params.arguments as any;
+            const healthResult = await client.healthCheck(args.include_details || false);
+            return {
+              content: [{ type: "text", text: JSON.stringify(healthResult, null, 2) }],
+            };
+          }
+
+          // Batch operations
+          case "stateset_batch_operations": {
+            const args = safeRequest.params.arguments as any;
+            const result = await executeBatchOperations(client, args.operations, args.options);
+            return {
+              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+            };
+          }
+          case "stateset_batch_create_orders": {
+            const args = safeRequest.params.arguments as any;
+            const operations = args.orders.map((order: any) => ({
+              type: 'create',
+              resource: 'order',
+              data: order,
+            }));
+            const result = await executeBatchOperations(client, operations, args.options);
+            return {
+              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+            };
+          }
+          case "stateset_batch_update_inventory": {
+            const args = safeRequest.params.arguments as any;
+            const operations = args.items.map((item: any) => ({
+              type: 'update',
+              resource: 'inventory',
+              data: item,
+            }));
+            const result = await executeBatchOperations(client, operations, args.options);
+            return {
+              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+            };
+          }
+          case "stateset_csv_import": {
+            const args = safeRequest.params.arguments as any;
+            // Parse CSV content and create operations
+            const rows = args.content.split('\n').filter((row: string) => row.trim());
+            const headers = rows[0]?.split(',').map((h: string) => h.trim()) || [];
+            const operations = rows.slice(1).map((row: string) => {
+              const values = row.split(',').map((v: string) => v.trim());
+              const data: any = {};
+              headers.forEach((header: string, i: number) => {
+                data[header] = values[i];
+              });
+              return {
+                type: 'create',
+                resource: args.resource,
+                data,
+              };
+            });
+            const result = await executeBatchOperations(client, operations, args.options);
+            return {
+              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+            };
+          }
+
+          // Cache operations
+          case "stateset_cache_stats": {
+            const args = safeRequest.params.arguments as any;
+            const stats = client.getCacheStats();
+            return {
+              content: [{ type: "text", text: JSON.stringify(
+                args.namespace ? (stats as any)[args.namespace] || {} : stats,
+                null, 2
+              ) }],
+            };
+          }
+
+          case "stateset_clear_cache": {
+            const args = safeRequest.params.arguments as any;
+            if (args.namespace) {
+              client.invalidateCache(args.namespace);
+            } else {
+              // Clear all known cache namespaces
+              ['rmas', 'orders', 'warranties', 'shipments', 'bom', 'workorders', 'mfgorders', 'invoices', 'products', 'inventory', 'customers'].forEach(ns => {
+                client.invalidateCache(ns);
+              });
+            }
+            return {
+              content: [{ type: "text", text: JSON.stringify({
+                success: true,
+                message: args.namespace
+                  ? `Cache namespace '${args.namespace}' cleared`
+                  : 'All caches cleared',
+              }, null, 2) }],
+            };
+          }
+
+          case "stateset_websocket_stats": {
+            const stats = wsManager.getStats();
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify({
+                  ...stats,
+                  description: "WebSocket server statistics for real-time updates. Clients can subscribe to channels like 'orders', 'rmas', 'shipments' etc. to receive live updates.",
+                  availableChannels: [
+                    "orders", "rmas", "warranties", "shipments", "invoices",
+                    "products", "inventory", "customers", "work_orders",
+                    "manufacturer_orders", "purchase_orders", "asns"
+                  ],
+                }, null, 2),
+              }],
+            };
+          }
+
+          // Search operations
+          case "stateset_advanced_search": {
+            const args = safeRequest.params.arguments as any;
+            const searchQuery = buildSearchQuery(
+              args.filters || [],
+              args.sort || [],
+              args.page || 1,
+              args.per_page || 20
+            );
+
+            // Map resource type to list method
+            const resourceMap: Record<string, () => Promise<any>> = {
+              orders: () => client.listOrders(searchQuery),
+              products: () => client.listProducts(searchQuery),
+              customers: () => client.listCustomers(searchQuery),
+              inventory: () => client.listInventories(searchQuery),
+              rmas: () => client.listRMAs(searchQuery),
+              invoices: () => client.listInvoices(searchQuery),
+            };
+
+            const listFn = resourceMap[args.resource];
+            if (!listFn) {
+              throw new Error(`Unknown resource type: ${args.resource}`);
+            }
+
+            const results = await listFn();
+            return {
+              content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+            };
+          }
+
+          case "stateset_search_orders_by_date": {
+            const args = safeRequest.params.arguments as any;
+            const filters: any[] = [];
+
+            if (args.date_range?.start) {
+              filters.push({ field: 'created_at', operator: 'gte', value: args.date_range.start });
+            }
+            if (args.date_range?.end) {
+              filters.push({ field: 'created_at', operator: 'lte', value: args.date_range.end });
+            }
+            if (args.status?.length) {
+              filters.push({ field: 'status', operator: 'in', value: args.status });
+            }
+            if (args.customer_email) {
+              filters.push({ field: 'customer_email', operator: 'eq', value: args.customer_email });
+            }
+            if (args.min_total !== undefined) {
+              filters.push({ field: 'total_amount', operator: 'gte', value: args.min_total });
+            }
+            if (args.max_total !== undefined) {
+              filters.push({ field: 'total_amount', operator: 'lte', value: args.max_total });
+            }
+
+            const sort = args.sort_by ? [{ field: args.sort_by, order: args.sort_order || 'desc' }] : [];
+            const searchQuery = buildSearchQuery(filters, sort, 1, 100);
+            const results = await client.listOrders(searchQuery);
+
+            return {
+              content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+            };
+          }
+
+          case "stateset_search_products_with_inventory": {
+            const args = safeRequest.params.arguments as any;
+            const filters: any[] = [];
+
+            if (args.query) {
+              filters.push({ field: 'name', operator: 'contains', value: args.query });
+            }
+            if (args.categories?.length) {
+              filters.push({ field: 'category', operator: 'in', value: args.categories });
+            }
+            if (args.price_range?.min !== undefined) {
+              filters.push({ field: 'price', operator: 'gte', value: args.price_range.min });
+            }
+            if (args.price_range?.max !== undefined) {
+              filters.push({ field: 'price', operator: 'lte', value: args.price_range.max });
+            }
+            if (args.in_stock_only) {
+              filters.push({ field: 'stock_quantity', operator: 'gt', value: 0 });
+            }
+            if (args.min_stock_level !== undefined) {
+              filters.push({ field: 'stock_quantity', operator: 'gte', value: args.min_stock_level });
+            }
+
+            const searchQuery = buildSearchQuery(filters, [], 1, 100);
+            const results = await client.listProducts(searchQuery);
+
+            return {
+              content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+            };
+          }
+
+          case "stateset_search_customer_analytics": {
+            const args = safeRequest.params.arguments as any;
+            const filters: any[] = [];
+
+            if (args.query) {
+              filters.push({ field: 'email', operator: 'contains', value: args.query });
+            }
+            if (args.min_lifetime_value !== undefined) {
+              filters.push({ field: 'lifetime_value', operator: 'gte', value: args.min_lifetime_value });
+            }
+            if (args.min_order_count !== undefined) {
+              filters.push({ field: 'order_count', operator: 'gte', value: args.min_order_count });
+            }
+            if (args.tags?.length) {
+              filters.push({ field: 'tags', operator: 'in', value: args.tags });
+            }
+            if (args.segment) {
+              filters.push({ field: 'segment', operator: 'eq', value: args.segment });
+            }
+
+            const searchQuery = buildSearchQuery(filters, [], 1, 100);
+            const results = await client.listCustomers(searchQuery);
+
+            return {
+              content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+            };
+          }
+
+          case "stateset_full_text_search": {
+            const args = safeRequest.params.arguments as any;
+            const resources = args.resources?.includes('all') ? ['orders', 'products', 'customers', 'rmas', 'invoices'] : (args.resources || ['all']);
+            const limit = args.limit || 10;
+
+            const filters = [{ field: 'search', operator: 'contains', value: args.query }];
+            const searchQuery = buildSearchQuery(filters, [], 1, limit);
+
+            // Resource search functions mapping
+            const resourceSearchers: Record<string, () => Promise<any>> = {
+              orders: () => client.listOrders(searchQuery),
+              products: () => client.listProducts(searchQuery),
+              customers: () => client.listCustomers(searchQuery),
+              rmas: () => client.listRMAs(searchQuery),
+              invoices: () => client.listInvoices(searchQuery),
+            };
+
+            // Execute all searches in parallel for better performance
+            const searchPromises = resources
+              .filter((r: string) => resourceSearchers[r])
+              .map(async (resource: string) => {
+                try {
+                  const searcher = resourceSearchers[resource];
+                  if (!searcher) {
+                    return { resource, data: { error: 'Unknown resource type' }, success: false };
+                  }
+                  const data = await searcher();
+                  return { resource, data, success: true };
+                } catch (error) {
+                  logger.warn('Search failed for resource', { resource, error: error instanceof Error ? error.message : 'Unknown' });
+                  return { resource, data: { error: 'Search failed for this resource' }, success: false };
+                }
+              });
+
+            const results = await Promise.all(searchPromises);
+
+            // Convert array results back to object
+            const searchResults = results.reduce((acc, { resource, data }) => {
+              acc[resource] = data;
+              return acc;
+            }, {} as Record<string, any>);
+
+            return {
+              content: [{ type: "text", text: JSON.stringify(searchResults, null, 2) }],
+            };
+          }
+
+          case "stateset_export_search_results": {
+            const args = safeRequest.params.arguments as any;
+            // Export functionality would typically write to a file
+            // For MCP, we return the formatted data
+            return {
+              content: [{ type: "text", text: JSON.stringify({
+                message: 'Export search results requires a search_id from a previous search. Use the advanced_search tool first.',
+                search_id: args.search_id,
+                format: args.format,
+                file_path: args.file_path,
+              }, null, 2) }],
+            };
+          }
+
+          case "stateset_saved_search": {
+            const args = safeRequest.params.arguments as any;
+            // Saved search management - would typically require persistence
+            return {
+              content: [{ type: "text", text: JSON.stringify({
+                action: args.action,
+                message: `Saved search action '${args.action}' acknowledged. This feature requires server-side persistence configuration.`,
+                config: args.search_config,
+              }, null, 2) }],
+            };
+          }
 
           default:
             throw new Error(`Unknown tool: ${request.params.name}`);
         }
       } catch (error) {
-        if (error instanceof ZodError) throw new Error(`Invalid arguments: ${error.message}`);
-        throw error;
+        const duration = Date.now() - startTime;
+
+        // Log failed request
+        logger.warn('Tool request failed', {
+          requestId,
+          tool: request.params.name,
+          duration,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+
+        // Use the error handler for better error messages
+        const apiError = handleError(error, { operation: request.params.name });
+        throw new Error(apiError.message);
       }
     });
 
@@ -3101,99 +2641,7 @@ async function main(): Promise<void> {
     });
 
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [
-        createRMATool,
-        updateRMATool,
-        createOrderTool,
-        updateOrderTool,
-        createWarrantyTool,
-        updateWarrantyTool,
-        createShipmentTool,
-        updateShipmentTool,
-        createBillOfMaterialsTool,
-        updateBillOfMaterialsTool,
-        createWorkOrderTool,
-        updateWorkOrderTool,
-        createManufacturerOrderTool,
-        updateManufacturerOrderTool,
-        createPurchaseOrderTool,
-        updatePurchaseOrderTool,
-        createASNTool,
-        updateASNTool,
-        createInvoiceTool,
-        updateInvoiceTool,
-        createPaymentTool,
-        updatePaymentTool,
-        createSalesOrderTool,
-        updateSalesOrderTool,
-        createFulfillmentOrderTool,
-        updateFulfillmentOrderTool,
-        createItemReceiptTool,
-        updateItemReceiptTool,
-        createCashSaleTool,
-        updateCashSaleTool,
-        createProductTool,
-        updateProductTool,
-        createInventoryTool,
-        updateInventoryTool,
-        createCustomerTool,
-        updateCustomerTool,
-        deleteRMATool,
-        deleteOrderTool,
-        deleteSalesOrderTool,
-        deleteWarrantyTool,
-        deleteShipmentTool,
-        deleteBillOfMaterialsTool,
-        deleteWorkOrderTool,
-        deleteManufacturerOrderTool,
-        deletePurchaseOrderTool,
-        deleteASNTool,
-        deleteInvoiceTool,
-        deletePaymentTool,
-        deleteFulfillmentOrderTool,
-        deleteItemReceiptTool,
-        deleteCashSaleTool,
-        deleteProductTool,
-        deleteInventoryTool,
-        deleteCustomerTool,
-        getRMATool,
-        getOrderTool,
-        getSalesOrderTool,
-        getWarrantyTool,
-        getShipmentTool,
-        getFulfillmentOrderTool,
-        getItemReceiptTool,
-        getCashSaleTool,
-        getBillOfMaterialsTool,
-        getWorkOrderTool,
-        getManufacturerOrderTool,
-        getPurchaseOrderTool,
-        getASNTool,
-        getInvoiceTool,
-        getPaymentTool,
-        getProductTool,
-        getInventoryTool,
-        getCustomerTool,
-        listRMAsTool,
-        listOrdersTool,
-        listSalesOrdersTool,
-        listWarrantiesTool,
-        listShipmentsTool,
-        listFulfillmentOrdersTool,
-        listItemReceiptsTool,
-        listCashSalesTool,
-        listBillOfMaterialsTool,
-        listWorkOrdersTool,
-        listManufacturerOrdersTool,
-        listPurchaseOrdersTool,
-        listASNsTool,
-        listInvoicesTool,
-        listPaymentsTool,
-        listProductsTool,
-        listInventoriesTool,
-        listCustomersTool,
-        getApiMetricsTool,
-      ],
+      tools,
     }));
 
     server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
@@ -3201,11 +2649,61 @@ async function main(): Promise<void> {
     }));
 
     const transport = new StdioServerTransport();
-    await server.listen(transport);
-    
+    await server.connect(transport);
+
     logger.info('Server started successfully');
+
+    // Graceful shutdown handling
+    let isShuttingDown = false;
+
+    const gracefulShutdown = async (signal: string) => {
+      if (isShuttingDown) {
+        logger.warn('Shutdown already in progress, forcing exit');
+        process.exit(1);
+      }
+
+      isShuttingDown = true;
+      logger.info(`Received ${signal}, starting graceful shutdown...`);
+
+      try {
+        // Close WebSocket connections
+        logger.info('Closing WebSocket connections...');
+        wsManager.stop();
+
+        // Clear caches
+        logger.info('Clearing caches...');
+        cacheManager.clear();
+
+        // Close server transport
+        logger.info('Closing server transport...');
+        await server.close();
+
+        logger.info('Graceful shutdown completed');
+        process.exit(0);
+      } catch (error) {
+        logger.error('Error during graceful shutdown', error);
+        process.exit(1);
+      }
+    };
+
+    // Handle shutdown signals
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+    // Handle uncaught exceptions
+    process.on('uncaughtException', (error) => {
+      logger.error('Uncaught exception', error);
+      gracefulShutdown('uncaughtException');
+    });
+
+    // Handle unhandled promise rejections
+    process.on('unhandledRejection', (reason, promise) => {
+      logger.error('Unhandled rejection', { reason, promise });
+      gracefulShutdown('unhandledRejection');
+    });
+
   } catch (error) {
-    logger.error({ error }, 'Failed to start server');
+    logger.error('Failed to start server', error);
     process.exit(1);
   }
 }

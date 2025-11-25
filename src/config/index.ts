@@ -10,7 +10,7 @@ const ConfigSchema = z.object({
   // API Configuration
   api: z.object({
     key: z.string().min(1, 'STATESET_API_KEY is required'),
-    baseUrl: z.string().url().default('https://api.stateset.com/v1'),
+    baseUrl: z.string().url().default('http://localhost:8080/api/v1'),
     version: z.string().default('v1'),
     timeout: z.number().positive().default(10000),
   }),
@@ -28,7 +28,7 @@ const ConfigSchema = z.object({
   server: z.object({
     name: z.string().default('stateset-mcp-server'),
     version: z.string().default('1.0.0'),
-    environment: z.enum(['development', 'staging', 'production']).default('production'),
+    environment: z.enum(['development', 'staging', 'production', 'test']).default('production'),
     logLevel: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   }),
   
@@ -41,6 +41,9 @@ const ConfigSchema = z.object({
     responseEnrichment: z.boolean().default(true),
     circuitBreaker: z.boolean().default(true),
     compression: z.boolean().default(true),
+    openApiConverter: z.boolean().default(false),
+    enableTelemetry: z.boolean().default(false),
+    websocket: z.boolean().default(true),
   }),
   
   // Cache Configuration
@@ -99,6 +102,9 @@ function loadConfig(): Config {
       responseEnrichment: process.env.FEATURE_RESPONSE_ENRICHMENT !== 'false',
       circuitBreaker: process.env.FEATURE_CIRCUIT_BREAKER !== 'false',
       compression: process.env.FEATURE_COMPRESSION !== 'false',
+      openApiConverter: process.env.FEATURE_OPEN_API_CONVERTER !== 'false',
+      enableTelemetry: process.env.FEATURE_ENABLE_TELEMETRY !== 'false',
+      websocket: process.env.FEATURE_WEBSOCKET !== 'false',
     },
     cache: {
       enabled: process.env.CACHE_ENABLED !== 'false',

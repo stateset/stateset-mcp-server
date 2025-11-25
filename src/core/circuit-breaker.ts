@@ -39,6 +39,7 @@ export interface CircuitBreakerOptions {
 interface RequestResult {
   success: boolean;
   duration: number;
+  timestamp: number;
   error?: Error;
 }
 
@@ -151,6 +152,7 @@ export class CircuitBreaker extends EventEmitter {
     this.requestHistory.push({
       success: true,
       duration,
+      timestamp: Date.now(),
     });
     
     this.trimHistory();
@@ -189,6 +191,7 @@ export class CircuitBreaker extends EventEmitter {
       success: false,
       duration,
       error,
+      timestamp: Date.now(),
     });
     
     this.trimHistory();
@@ -287,10 +290,10 @@ export class CircuitBreaker extends EventEmitter {
     // Keep only recent history (last 100 requests or last 5 minutes)
     const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
     const maxSize = 100;
-    
-    if (this.requestHistory.length > maxSize) {
-      this.requestHistory = this.requestHistory.slice(-maxSize);
-    }
+
+    this.requestHistory = this.requestHistory
+      .filter((entry) => entry.timestamp >= fiveMinutesAgo)
+      .slice(-maxSize);
   }
 
   private startMonitoring(): void {
@@ -433,7 +436,7 @@ export const circuitBreakerManager = new CircuitBreakerManager();
 
 // Decorator for circuit breaker protection
 export function CircuitBreakerProtected(name: string, options?: Partial<CircuitBreakerOptions>) {
-  return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
+  return function (_target: any, propertyName: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {

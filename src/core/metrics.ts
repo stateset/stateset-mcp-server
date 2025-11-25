@@ -133,11 +133,9 @@ class Summary {
   private sum: number = 0;
   private count: number = 0;
   private maxAge: number;
-  private ageBuckets: number;
 
-  constructor(maxAge: number = 600000, ageBuckets: number = 5) {
+  constructor(maxAge: number = 600000) {
     this.maxAge = maxAge;
-    this.ageBuckets = ageBuckets;
   }
 
   observe(value: number): void {
@@ -474,6 +472,41 @@ export class MetricsCollector extends EventEmitter {
     }
 
     return [name, labels];
+  }
+
+  // Alias methods for compatibility with batch-processor
+  incrementCounter(name: string, value: number = 1, labels: Labels = {}): void {
+    this.increment(name, value, labels);
+  }
+
+  recordHistogram(name: string, value: number, labels: Labels = {}): void {
+    this.observe(name, value, labels);
+  }
+
+  setGauge(name: string, value: number, labels: Labels = {}): void {
+    this.set(name, value, labels);
+  }
+
+  getCounter(name: string, labels: Labels = {}): number {
+    const key = this.getKey(name, labels);
+    return this.counters.get(key) || 0;
+  }
+
+  // Profile an async operation and record its duration
+  async profile<T>(name: string, fn: () => Promise<T>, labels: Labels = {}): Promise<T> {
+    const startTime = Date.now();
+    try {
+      const result = await fn();
+      const duration = Date.now() - startTime;
+      this.observe(`${name}_duration_ms`, duration, labels);
+      this.increment(`${name}_total`, 1, { ...labels, status: 'success' });
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.observe(`${name}_duration_ms`, duration, labels);
+      this.increment(`${name}_total`, 1, { ...labels, status: 'error' });
+      throw error;
+    }
   }
 }
 

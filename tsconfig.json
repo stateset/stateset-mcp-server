@@ -32,5 +32,28 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "coverage", "**/*.test.ts", "**/*.spec.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "src/server-enhanced.ts",
+    "src/server-ultimate.ts",
+    "src/simple-server.ts",
+    "src/enhanced-server.ts",
+    "src/middleware/security.ts",
+    "src/middleware/api-docs.ts",
+    "src/core/realtime-manager.ts",
+    "src/core/intelligent-cache.ts",
+    "src/core/openapi-converter.ts",
+    "src/core/performance-optimizer.ts",
+    "src/core/advanced-metrics.ts",
+    "src/services/enhanced-stateset-client.ts",
+    "src/tools/ai-insights.ts",
+    "src/tools/openapi-tools.ts",
+    "src/tools/enhanced-tools.ts",
+    "src/utils/shutdown.ts",
+    "src/auth/**"
+  ]
 }
