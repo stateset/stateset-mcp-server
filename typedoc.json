@@ -1,0 +1,72 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["./src/index.ts"],
+  "out": "./docs/api",
+  "plugin": [],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/node_modules/**",
+    "src/middleware/security.ts",
+    "src/middleware/api-docs.ts",
+    "src/core/realtime-manager.ts",
+    "src/core/intelligent-cache.ts",
+    "src/core/openapi-converter.ts",
+    "src/core/performance-optimizer.ts",
+    "src/core/advanced-metrics.ts",
+    "src/services/enhanced-stateset-client.ts",
+    "src/tools/ai-insights.ts",
+    "src/tools/openapi-tools.ts",
+    "src/tools/enhanced-tools.ts",
+    "src/utils/shutdown.ts",
+    "src/auth/**"
+  ],
+  "excludePrivate": false,
+  "excludeProtected": false,
+  "excludeExternals": true,
+  "readme": "./README.md",
+  "name": "StateSet MCP Server API Documentation",
+  "includeVersion": true,
+  "sort": ["source-order"],
+  "kindSortOrder": [
+    "Project",
+    "Module",
+    "Namespace",
+    "Enum",
+    "EnumMember",
+    "Class",
+    "Interface",
+    "TypeAlias",
+    "Constructor",
+    "Property",
+    "Variable",
+    "Function",
+    "Accessor",
+    "Method",
+    "Parameter",
+    "TypeParameter",
+    "TypeLiteral",
+    "CallSignature",
+    "ConstructorSignature",
+    "IndexSignature",
+    "GetSignature",
+    "SetSignature"
+  ],
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": true
+  },
+  "visibilityFilters": {
+    "protected": false,
+    "private": false,
+    "inherited": true,
+    "external": false
+  },
+  "searchInComments": true,
+  "cleanOutputDir": true,
+  "titleLink": "https://github.com/stateset/mcp-server",
+  "navigationLinks": {
+    "GitHub": "https://github.com/stateset/mcp-server",
+    "Documentation": "https://docs.stateset.io"
+  }
+}

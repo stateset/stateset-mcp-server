@@ -1,0 +1,270 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="."><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>StateSet MCP Server API Documentation - v1.0.0</title><meta name="description" content="Documentation for StateSet MCP Server API Documentation"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><div class="table-cell" id="tsd-search"><div class="field"><label for="tsd-search-field" class="tsd-widget tsd-toolbar-icon search no-caption"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></label><input type="text" id="tsd-search-field" aria-label="Search"/></div><div class="field"><div id="tsd-toolbar-links"><a href="https://github.com/stateset/mcp-server">GitHub</a><a href="https://docs.stateset.io">Documentation</a></div></div><ul class="results"><li class="state loading">Preparing search index...</li><li class="state failure">The search index is not available</li></ul><a href="https://github.com/stateset/mcp-server" class="title">StateSet MCP Server API Documentation - v1.0.0</a></div><div class="table-cell" id="tsd-widgets"><a href="#" class="tsd-widget tsd-toolbar-icon menu no-caption" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h1>StateSet MCP Server API Documentation - v1.0.0</h1></div><div class="tsd-panel tsd-typography"><a id="stateset-mcp-server" class="tsd-anchor"></a><h1 class="tsd-anchor-link">StateSet MCP Server<a href="#stateset-mcp-server" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1><p><a href="https://github.com/stateset/mcp-server/actions/workflows/ci.yml"><img src="https://github.com/stateset/mcp-server/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline"></a>
+<a href="https://codecov.io/gh/stateset/mcp-server"><img src="https://codecov.io/gh/stateset/mcp-server/branch/master/graph/badge.svg" alt="codecov"></a>
+<a href="https://badge.fury.io/js/stateset-mcp-server"><img src="https://badge.fury.io/js/stateset-mcp-server.svg" alt="npm version"></a>
+<a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a></p>
+<p>A world-class Model Context Protocol (MCP) server for StateSet API integration, providing comprehensive e-commerce operations management through a standardized interface.</p>
+<a id="🚀-features" class="tsd-anchor"></a><h2 class="tsd-anchor-link">🚀 Features<a href="#🚀-features" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><ul>
+<li><strong>Comprehensive API Coverage</strong>: Full support for StateSet's e-commerce operations</li>
+<li><strong>Type-Safe</strong>: Built with TypeScript for maximum type safety</li>
+<li><strong>Production-Ready</strong>: Includes health checks, metrics, and graceful shutdown</li>
+<li><strong>Well-Tested</strong>: Comprehensive test suite with 136+ passing tests covering core functionality</li>
+<li><strong>Observable</strong>: Built-in logging, metrics, and request tracing</li>
+<li><strong>Scalable</strong>: Rate limiting, connection pooling, and efficient resource management</li>
+<li><strong>Secure</strong>: API key redaction, secure configuration, and input validation</li>
+<li><strong>Developer-Friendly</strong>: Hot reloading, detailed documentation, and helpful error messages</li>
+<li><strong>OpenAPI Integration</strong>: Dynamic tool generation from OpenAPI specifications</li>
+<li><strong>Multi-Format Support</strong>: Export tools to MCP, OpenAI, or Anthropic formats</li>
+</ul>
+<a id="📋-table-of-contents" class="tsd-anchor"></a><h2 class="tsd-anchor-link">📋 Table of Contents<a href="#📋-table-of-contents" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><ul>
+<li><a href="#installation">Installation</a></li>
+<li><a href="#quick-start">Quick Start</a></li>
+<li><a href="#configuration">Configuration</a></li>
+<li><a href="#architecture">Architecture</a></li>
+<li><a href="#api-reference">API Reference</a></li>
+<li><a href="#development">Development</a></li>
+<li><a href="#testing">Testing</a></li>
+<li><a href="#deployment">Deployment</a></li>
+<li><a href="#monitoring">Monitoring</a></li>
+<li><a href="#contributing">Contributing</a></li>
+<li><a href="#license">License</a></li>
+</ul>
+<a id="🔧-installation" class="tsd-anchor"></a><h2 class="tsd-anchor-link">🔧 Installation<a href="#🔧-installation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><a id="using-npm" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Using npm<a href="#using-npm" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">install</span><span class="hl-1"> </span><span class="hl-3">-g</span><span class="hl-1"> </span><span class="hl-2">stateset-mcp-server</span>
+</code><button type="button">Copy</button></pre>
+
+<a id="using-docker" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Using Docker<a href="#using-docker" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="bash"><span class="hl-0">docker</span><span class="hl-1"> </span><span class="hl-2">pull</span><span class="hl-1"> </span><span class="hl-2">stateset/mcp-server:latest</span>
+</code><button type="button">Copy</button></pre>
+
+<a id="from-source" class="tsd-anchor"></a><h3 class="tsd-anchor-link">From Source<a href="#from-source" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="bash"><span class="hl-0">git</span><span class="hl-1"> </span><span class="hl-2">clone</span><span class="hl-1"> </span><span class="hl-2">https://github.com/stateset/mcp-server.git</span><br/><span class="hl-0">cd</span><span class="hl-1"> </span><span class="hl-2">mcp-server</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">install</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">build</span>
+</code><button type="button">Copy</button></pre>
+
+<a id="🏃-quick-start" class="tsd-anchor"></a><h2 class="tsd-anchor-link">🏃 Quick Start<a href="#🏃-quick-start" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><ol>
+<li><strong>Set up environment variables</strong>:</li>
+</ol>
+<pre><code class="bash"><span class="hl-0">cp</span><span class="hl-1"> </span><span class="hl-2">.env.example</span><span class="hl-1"> </span><span class="hl-2">.env</span><br/><span class="hl-4"># Edit .env with your StateSet API credentials</span>
+</code><button type="button">Copy</button></pre>
+
+<ol start="2">
+<li><strong>Run the server</strong>:</li>
+</ol>
+<pre><code class="bash"><span class="hl-4"># Using npm</span><br/><span class="hl-0">stateset-mcp-server</span><br/><br/><span class="hl-4"># Using Docker</span><br/><span class="hl-0">docker</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-3">--env-file</span><span class="hl-1"> </span><span class="hl-2">.env</span><span class="hl-1"> </span><span class="hl-2">stateset/mcp-server</span><br/><br/><span class="hl-4"># From source</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">start</span>
+</code><button type="button">Copy</button></pre>
+
+<ol start="3">
+<li><strong>Connect your MCP client</strong>:</li>
+</ol>
+<pre><code class="javascript"><span class="hl-5">import</span><span class="hl-1"> { </span><span class="hl-6">Client</span><span class="hl-1"> } </span><span class="hl-5">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@modelcontextprotocol/sdk&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-3">const</span><span class="hl-1"> </span><span class="hl-7">client</span><span class="hl-1"> = </span><span class="hl-3">new</span><span class="hl-1"> </span><span class="hl-0">Client</span><span class="hl-1">({</span><br/><span class="hl-1">  </span><span class="hl-6">name:</span><span class="hl-1"> </span><span class="hl-2">&#39;my-app&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">version:</span><span class="hl-1"> </span><span class="hl-2">&#39;1.0.0&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-5">await</span><span class="hl-1"> </span><span class="hl-6">client</span><span class="hl-1">.</span><span class="hl-0">connect</span><span class="hl-1">(</span><span class="hl-6">transport</span><span class="hl-1">);</span>
+</code><button type="button">Copy</button></pre>
+
+<a id="⚙️-configuration" class="tsd-anchor"></a><h2 class="tsd-anchor-link">⚙️ Configuration<a href="#⚙️-configuration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><a id="environment-variables" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Environment Variables<a href="#environment-variables" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+<th>Default</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>STATESET_API_KEY</code></td>
+<td>Your StateSet API key</td>
+<td>-</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>STATESET_BASE_URL</code></td>
+<td>StateSet API base URL</td>
+<td><code>https://api.stateset.io/v1</code></td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>REQUESTS_PER_HOUR</code></td>
+<td>Rate limit for API requests</td>
+<td><code>1000</code></td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>API_TIMEOUT_MS</code></td>
+<td>Request timeout in milliseconds</td>
+<td><code>10000</code></td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>LOG_LEVEL</code></td>
+<td>Logging level</td>
+<td><code>info</code></td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>ENABLE_METRICS</code></td>
+<td>Enable metrics collection</td>
+<td><code>true</code></td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>ENABLE_HEALTH_CHECK</code></td>
+<td>Enable health check endpoint</td>
+<td><code>true</code></td>
+<td>❌</td>
+</tr>
+</tbody>
+</table>
+<a id="advanced-configuration" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Advanced Configuration<a href="#advanced-configuration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>Create a <code>config/custom.json</code> file for advanced configuration:</p>
+<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;rateLimit&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">    </span><span class="hl-8">&quot;requestsPerHour&quot;</span><span class="hl-1">: </span><span class="hl-9">2000</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-8">&quot;retryAttempts&quot;</span><span class="hl-1">: </span><span class="hl-9">5</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-8">&quot;retryDelay&quot;</span><span class="hl-1">: </span><span class="hl-9">2000</span><br/><span class="hl-1">  },</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;features&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">    </span><span class="hl-8">&quot;enableMetrics&quot;</span><span class="hl-1">: </span><span class="hl-3">true</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-8">&quot;enableHealthCheck&quot;</span><span class="hl-1">: </span><span class="hl-3">true</span><span class="hl-1">,</span><br/><span class="hl-1">    </span><span class="hl-8">&quot;enableRequestLogging&quot;</span><span class="hl-1">: </span><span class="hl-3">true</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">}</span>
+</code><button type="button">Copy</button></pre>
+
+<a id="🏗️-architecture" class="tsd-anchor"></a><h2 class="tsd-anchor-link">🏗️ Architecture<a href="#🏗️-architecture" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><a id="directory-structure" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Directory Structure<a href="#directory-structure" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code><span class="hl-6">src</span><span class="hl-1">/</span><br/><span class="hl-1">├── </span><span class="hl-6">config</span><span class="hl-1">/         # </span><span class="hl-6">Configuration</span><span class="hl-1"> </span><span class="hl-6">management</span><br/><span class="hl-1">├── </span><span class="hl-6">core</span><span class="hl-1">/           # </span><span class="hl-6">Core</span><span class="hl-1"> </span><span class="hl-6">server</span><span class="hl-1"> </span><span class="hl-6">implementation</span><br/><span class="hl-1">├── </span><span class="hl-6">services</span><span class="hl-1">/       # </span><span class="hl-6">Business</span><span class="hl-1"> </span><span class="hl-6">logic</span><span class="hl-1"> </span><span class="hl-6">and</span><span class="hl-1"> </span><span class="hl-7">API</span><span class="hl-1"> </span><span class="hl-6">clients</span><br/><span class="hl-1">├── </span><span class="hl-6">tools</span><span class="hl-1">/          # </span><span class="hl-7">MCP</span><span class="hl-1"> </span><span class="hl-6">tool</span><span class="hl-1"> </span><span class="hl-6">implementations</span><br/><span class="hl-1">├── </span><span class="hl-6">types</span><span class="hl-1">/          # </span><span class="hl-6">TypeScript</span><span class="hl-1"> </span><span class="hl-3">type</span><span class="hl-1"> </span><span class="hl-10">definitions</span><br/><span class="hl-1">├── utils/          # Utility functions</span><br/><span class="hl-1">└── middleware/     # Request/response middleware</span>
+</code><button>Copy</button></pre>
+
+<a id="key-components" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Key Components<a href="#key-components" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
+<li><strong>Server Core</strong>: Handles MCP protocol communication</li>
+<li><strong>StateSet Client</strong>: Manages API interactions with rate limiting</li>
+<li><strong>Tool Registry</strong>: Organizes and validates tool implementations</li>
+<li><strong>Metrics Collector</strong>: Tracks performance and usage metrics</li>
+<li><strong>Error Handler</strong>: Provides consistent error responses</li>
+</ul>
+<a id="📚-api-reference" class="tsd-anchor"></a><h2 class="tsd-anchor-link">📚 API Reference<a href="#📚-api-reference" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><a id="tools" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Tools<a href="#tools" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>The server exposes 100+ tools organized by domain:</p>
+<a id="orders--returns" class="tsd-anchor"></a><h4 class="tsd-anchor-link">Orders &amp; Returns<a href="#orders--returns" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4><ul>
+<li><code>stateset_create_order</code> - Create a new order</li>
+<li><code>stateset_update_order</code> - Update order details</li>
+<li><code>stateset_get_order</code> - Retrieve order information</li>
+<li><code>stateset_list_orders</code> - List orders with pagination</li>
+<li>And 90+ more tools for complete e-commerce operations</li>
+</ul>
+<a id="inventory--products" class="tsd-anchor"></a><h4 class="tsd-anchor-link">Inventory &amp; Products<a href="#inventory--products" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4><ul>
+<li><code>stateset_create_product</code> - Add a new product</li>
+<li><code>stateset_update_inventory</code> - Update inventory levels</li>
+<li><code>stateset_get_product</code> - Get product details</li>
+</ul>
+<a id="financial" class="tsd-anchor"></a><h4 class="tsd-anchor-link">Financial<a href="#financial" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4><ul>
+<li><code>stateset_create_invoice</code> - Generate an invoice</li>
+<li><code>stateset_process_payment</code> - Process a payment</li>
+<li><code>stateset_list_transactions</code> - List financial transactions</li>
+</ul>
+<a id="resources" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Resources<a href="#resources" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>Access StateSet resources through URI templates:</p>
+<pre><code><span class="hl-6">stateset</span><span class="hl-1">-</span><span class="hl-11">order</span><span class="hl-1">:</span><span class="hl-4">///ORDER-123</span><br/><span class="hl-6">stateset</span><span class="hl-1">-</span><span class="hl-11">customer</span><span class="hl-1">:</span><span class="hl-4">///CUST-456</span><br/><span class="hl-6">stateset</span><span class="hl-1">-</span><span class="hl-11">product</span><span class="hl-1">:</span><span class="hl-4">///PROD-789</span>
+</code><button>Copy</button></pre>
+
+<a id="prompts" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Prompts<a href="#prompts" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>Pre-configured prompts for common workflows:</p>
+<ul>
+<li><code>order-fulfillment</code> - Complete order fulfillment workflow</li>
+<li><code>return-processing</code> - Handle product returns</li>
+<li><code>inventory-management</code> - Manage inventory levels</li>
+</ul>
+<a id="🛠️-development" class="tsd-anchor"></a><h2 class="tsd-anchor-link">🛠️ Development<a href="#🛠️-development" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><a id="prerequisites" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Prerequisites<a href="#prerequisites" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
+<li>Node.js &gt;= 18.0.0</li>
+<li>npm &gt;= 8.0.0</li>
+<li>TypeScript &gt;= 5.0.0</li>
+</ul>
+<a id="setup" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Setup<a href="#setup" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="bash"><span class="hl-4"># Install dependencies</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">install</span><br/><br/><span class="hl-4"># Run in development mode</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">dev</span><br/><br/><span class="hl-4"># Run linting</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">lint</span><br/><br/><span class="hl-4"># Format code</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">format</span><br/><br/><span class="hl-4"># Type check</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">typecheck</span>
+</code><button type="button">Copy</button></pre>
+
+<a id="project-scripts" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Project Scripts<a href="#project-scripts" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><table>
+<thead>
+<tr>
+<th>Script</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>npm run dev</code></td>
+<td>Start development server with hot reload</td>
+</tr>
+<tr>
+<td><code>npm run build</code></td>
+<td>Build production bundle</td>
+</tr>
+<tr>
+<td><code>npm run test</code></td>
+<td>Run all tests</td>
+</tr>
+<tr>
+<td><code>npm run test:watch</code></td>
+<td>Run tests in watch mode</td>
+</tr>
+<tr>
+<td><code>npm run test:coverage</code></td>
+<td>Generate coverage report</td>
+</tr>
+<tr>
+<td><code>npm run lint</code></td>
+<td>Run ESLint</td>
+</tr>
+<tr>
+<td><code>npm run format</code></td>
+<td>Format code with Prettier</td>
+</tr>
+<tr>
+<td><code>npm run docs</code></td>
+<td>Generate API documentation</td>
+</tr>
+</tbody>
+</table>
+<a id="🧪-testing" class="tsd-anchor"></a><h2 class="tsd-anchor-link">🧪 Testing<a href="#🧪-testing" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><a id="running-tests" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Running Tests<a href="#running-tests" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="bash"><span class="hl-4"># Run all tests</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">test</span><br/><br/><span class="hl-4"># Run unit tests only</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">test:unit</span><br/><br/><span class="hl-4"># Run integration tests</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">test:integration</span><br/><br/><span class="hl-4"># Run E2E tests</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">test:e2e</span><br/><br/><span class="hl-4"># Generate coverage report</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">test:coverage</span>
+</code><button type="button">Copy</button></pre>
+
+<a id="test-structure" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Test Structure<a href="#test-structure" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code><span class="hl-6">tests</span><span class="hl-1">/</span><br/><span class="hl-1">├── </span><span class="hl-6">unit</span><span class="hl-1">/           # </span><span class="hl-6">Unit</span><span class="hl-1"> </span><span class="hl-6">tests</span><span class="hl-1"> </span><span class="hl-6">for</span><span class="hl-1"> </span><span class="hl-6">individual</span><span class="hl-1"> </span><span class="hl-6">components</span><br/><span class="hl-1">├── </span><span class="hl-6">integration</span><span class="hl-1">/    # </span><span class="hl-6">Integration</span><span class="hl-1"> </span><span class="hl-6">tests</span><span class="hl-1"> </span><span class="hl-6">for</span><span class="hl-1"> </span><span class="hl-7">API</span><span class="hl-1"> </span><span class="hl-6">interactions</span><br/><span class="hl-1">├── </span><span class="hl-6">e2e</span><span class="hl-1">/           # </span><span class="hl-6">End</span><span class="hl-1">-</span><span class="hl-6">to</span><span class="hl-1">-</span><span class="hl-6">end</span><span class="hl-1"> </span><span class="hl-6">tests</span><span class="hl-1"> </span><span class="hl-6">for</span><span class="hl-1"> </span><span class="hl-6">complete</span><span class="hl-1"> </span><span class="hl-6">workflows</span><br/><span class="hl-1">└── </span><span class="hl-6">fixtures</span><span class="hl-1">/      # </span><span class="hl-6">Test</span><span class="hl-1"> </span><span class="hl-6">data</span><span class="hl-1"> </span><span class="hl-6">and</span><span class="hl-1"> </span><span class="hl-6">mocks</span>
+</code><button>Copy</button></pre>
+
+<a id="writing-tests" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Writing Tests<a href="#writing-tests" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="typescript"><span class="hl-5">import</span><span class="hl-1"> { </span><span class="hl-6">createServer</span><span class="hl-1"> } </span><span class="hl-5">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@core/server&#39;</span><span class="hl-1">;</span><br/><span class="hl-5">import</span><span class="hl-1"> { </span><span class="hl-6">mockConfig</span><span class="hl-1"> } </span><span class="hl-5">from</span><span class="hl-1"> </span><span class="hl-2">&#39;../fixtures/config&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-0">describe</span><span class="hl-1">(</span><span class="hl-2">&#39;Server&#39;</span><span class="hl-1">, () </span><span class="hl-3">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-0">it</span><span class="hl-1">(</span><span class="hl-2">&#39;should start successfully&#39;</span><span class="hl-1">, </span><span class="hl-3">async</span><span class="hl-1"> () </span><span class="hl-3">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-3">const</span><span class="hl-1"> </span><span class="hl-7">server</span><span class="hl-1"> = </span><span class="hl-5">await</span><span class="hl-1"> </span><span class="hl-0">createServer</span><span class="hl-1">(</span><span class="hl-6">mockConfig</span><span class="hl-1">);</span><br/><span class="hl-1">    </span><span class="hl-5">await</span><span class="hl-1"> </span><span class="hl-0">expect</span><span class="hl-1">(</span><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-0">start</span><span class="hl-1">()).</span><span class="hl-6">resolves</span><span class="hl-1">.</span><span class="hl-6">not</span><span class="hl-1">.</span><span class="hl-0">toThrow</span><span class="hl-1">();</span><br/><span class="hl-1">  });</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<a id="🚀-deployment" class="tsd-anchor"></a><h2 class="tsd-anchor-link">🚀 Deployment<a href="#🚀-deployment" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><a id="docker-deployment" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Docker Deployment<a href="#docker-deployment" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="bash"><span class="hl-4"># Build image</span><br/><span class="hl-0">docker</span><span class="hl-1"> </span><span class="hl-2">build</span><span class="hl-1"> </span><span class="hl-3">-t</span><span class="hl-1"> </span><span class="hl-2">stateset-mcp-server</span><span class="hl-1"> </span><span class="hl-2">.</span><br/><br/><span class="hl-4"># Run container</span><br/><span class="hl-0">docker</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-3">-d</span><span class="hl-1"> </span><span class="hl-12">\</span><br/><span class="hl-1">  </span><span class="hl-3">--name</span><span class="hl-1"> </span><span class="hl-2">stateset-mcp</span><span class="hl-1"> </span><span class="hl-12">\</span><br/><span class="hl-1">  </span><span class="hl-3">--env-file</span><span class="hl-1"> </span><span class="hl-2">.env</span><span class="hl-1"> </span><span class="hl-12">\</span><br/><span class="hl-1">  </span><span class="hl-3">-p</span><span class="hl-1"> </span><span class="hl-2">3000:3000</span><span class="hl-1"> </span><span class="hl-12">\</span><br/><span class="hl-1">  </span><span class="hl-2">stateset-mcp-server</span>
+</code><button type="button">Copy</button></pre>
+
+<a id="kubernetes-deployment" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Kubernetes Deployment<a href="#kubernetes-deployment" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><pre><code class="yaml"><span class="hl-13">apiVersion</span><span class="hl-1">: </span><span class="hl-14">apps/v1</span><br/><span class="hl-13">kind</span><span class="hl-1">: </span><span class="hl-14">Deployment</span><br/><span class="hl-13">metadata</span><span class="hl-1">:</span><br/><span class="hl-1">  </span><span class="hl-13">name</span><span class="hl-1">: </span><span class="hl-14">stateset-mcp-server</span><br/><span class="hl-13">spec</span><span class="hl-1">:</span><br/><span class="hl-1">  </span><span class="hl-13">replicas</span><span class="hl-1">: </span><span class="hl-9">3</span><br/><span class="hl-1">  </span><span class="hl-13">selector</span><span class="hl-1">:</span><br/><span class="hl-1">    </span><span class="hl-13">matchLabels</span><span class="hl-1">:</span><br/><span class="hl-1">      </span><span class="hl-13">app</span><span class="hl-1">: </span><span class="hl-14">stateset-mcp</span><br/><span class="hl-1">  </span><span class="hl-13">template</span><span class="hl-1">:</span><br/><span class="hl-1">    </span><span class="hl-13">metadata</span><span class="hl-1">:</span><br/><span class="hl-1">      </span><span class="hl-13">labels</span><span class="hl-1">:</span><br/><span class="hl-1">        </span><span class="hl-13">app</span><span class="hl-1">: </span><span class="hl-14">stateset-mcp</span><br/><span class="hl-1">    </span><span class="hl-13">spec</span><span class="hl-1">:</span><br/><span class="hl-1">      </span><span class="hl-13">containers</span><span class="hl-1">:</span><br/><span class="hl-1">      - </span><span class="hl-13">name</span><span class="hl-1">: </span><span class="hl-14">server</span><br/><span class="hl-1">        </span><span class="hl-13">image</span><span class="hl-1">: </span><span class="hl-14">stateset/mcp-server:latest</span><br/><span class="hl-1">        </span><span class="hl-13">envFrom</span><span class="hl-1">:</span><br/><span class="hl-1">        - </span><span class="hl-13">secretRef</span><span class="hl-1">:</span><br/><span class="hl-1">            </span><span class="hl-13">name</span><span class="hl-1">: </span><span class="hl-14">stateset-secrets</span><br/><span class="hl-1">        </span><span class="hl-13">resources</span><span class="hl-1">:</span><br/><span class="hl-1">          </span><span class="hl-13">requests</span><span class="hl-1">:</span><br/><span class="hl-1">            </span><span class="hl-13">memory</span><span class="hl-1">: </span><span class="hl-2">&quot;256Mi&quot;</span><br/><span class="hl-1">            </span><span class="hl-13">cpu</span><span class="hl-1">: </span><span class="hl-2">&quot;250m&quot;</span><br/><span class="hl-1">          </span><span class="hl-13">limits</span><span class="hl-1">:</span><br/><span class="hl-1">            </span><span class="hl-13">memory</span><span class="hl-1">: </span><span class="hl-2">&quot;512Mi&quot;</span><br/><span class="hl-1">            </span><span class="hl-13">cpu</span><span class="hl-1">: </span><span class="hl-2">&quot;500m&quot;</span>
+</code><button type="button">Copy</button></pre>
+
+<a id="cloud-deployment" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Cloud Deployment<a href="#cloud-deployment" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
+<li><strong>AWS</strong>: Use ECS or EKS with the provided Docker image</li>
+<li><strong>Google Cloud</strong>: Deploy to Cloud Run or GKE</li>
+<li><strong>Azure</strong>: Use Container Instances or AKS</li>
+</ul>
+<a id="📊-monitoring" class="tsd-anchor"></a><h2 class="tsd-anchor-link">📊 Monitoring<a href="#📊-monitoring" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><a id="health-checks" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Health Checks<a href="#health-checks" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>The server exposes health check endpoints:</p>
+<pre><code class="bash"><span class="hl-4"># Liveness probe</span><br/><span class="hl-0">curl</span><span class="hl-1"> </span><span class="hl-2">http://localhost:3000/health/live</span><br/><br/><span class="hl-4"># Readiness probe</span><br/><span class="hl-0">curl</span><span class="hl-1"> </span><span class="hl-2">http://localhost:3000/health/ready</span>
+</code><button type="button">Copy</button></pre>
+
+<a id="metrics" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Metrics<a href="#metrics" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>Prometheus-compatible metrics are available:</p>
+<pre><code class="bash"><span class="hl-0">curl</span><span class="hl-1"> </span><span class="hl-2">http://localhost:3000/metrics</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Key metrics:</p>
+<ul>
+<li><code>stateset_api_requests_total</code> - Total API requests</li>
+<li><code>stateset_api_request_duration_seconds</code> - Request duration histogram</li>
+<li><code>stateset_api_errors_total</code> - Total API errors</li>
+<li><code>stateset_rate_limit_queue_size</code> - Current rate limit queue size</li>
+</ul>
+<a id="logging" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Logging<a href="#logging" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>Structured JSON logs with configurable levels:</p>
+<pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;level&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;info&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;time&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;2024-01-01T12:00:00.000Z&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;context&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;api&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;method&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;POST&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;url&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;/orders&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;duration&quot;</span><span class="hl-1">: </span><span class="hl-9">123</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;status&quot;</span><span class="hl-1">: </span><span class="hl-9">200</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-8">&quot;msg&quot;</span><span class="hl-1">: </span><span class="hl-2">&quot;API request completed&quot;</span><br/><span class="hl-1">}</span>
+</code><button type="button">Copy</button></pre>
+
+<a id="🤝-contributing" class="tsd-anchor"></a><h2 class="tsd-anchor-link">🤝 Contributing<a href="#🤝-contributing" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>We welcome contributions! Please see our <a href="media/CONTRIBUTING.md">Contributing Guide</a> for details.</p>
+<a id="development-workflow" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Development Workflow<a href="#development-workflow" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ol>
+<li>Fork the repository</li>
+<li>Create a feature branch (<code>git checkout -b feature/amazing-feature</code>)</li>
+<li>Commit your changes (<code>git commit -m 'Add amazing feature'</code>)</li>
+<li>Push to the branch (<code>git push origin feature/amazing-feature</code>)</li>
+<li>Open a Pull Request</li>
+</ol>
+<a id="code-standards" class="tsd-anchor"></a><h3 class="tsd-anchor-link">Code Standards<a href="#code-standards" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><ul>
+<li>Follow TypeScript best practices</li>
+<li>Maintain 80%+ test coverage</li>
+<li>Use conventional commits</li>
+<li>Document all public APIs</li>
+<li>Add JSDoc comments for complex functions</li>
+</ul>
+<a id="📄-license" class="tsd-anchor"></a><h2 class="tsd-anchor-link">📄 License<a href="#📄-license" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>This project is licensed under the MIT License - see the <a href="media/LICENSE">LICENSE</a> file for details.</p>
+<a id="🙏-acknowledgments" class="tsd-anchor"></a><h2 class="tsd-anchor-link">🙏 Acknowledgments<a href="#🙏-acknowledgments" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><ul>
+<li><a href="https://github.com/modelcontextprotocol">Model Context Protocol</a> for the MCP specification</li>
+<li><a href="https://stateset.io">StateSet</a> for the comprehensive e-commerce API</li>
+<li>All our contributors and users</li>
+</ul>
+<a id="📞-support" class="tsd-anchor"></a><h2 class="tsd-anchor-link">📞 Support<a href="#📞-support" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><ul>
+<li>📧 Email: <a href="mailto:support@stateset.io">support@stateset.io</a></li>
+<li>💬 Discord: <a href="https://discord.gg/stateset">Join our community</a></li>
+<li>📚 Documentation: <a href="https://docs.stateset.io">docs.stateset.io</a></li>
+<li>🐛 Issues: <a href="https://github.com/stateset/mcp-server/issues">GitHub Issues</a></li>
+</ul>
+</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-private" name="private"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Private</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#stateset-mcp-server"><span>State<wbr/>Set MCP <wbr/>Server</span></a><ul><li><a href="#🚀-features"><span>🚀 <wbr/>Features</span></a></li><li><a href="#📋-table-of-contents"><span>📋 <wbr/>Table of <wbr/>Contents</span></a></li><li><a href="#🔧-installation"><span>🔧 <wbr/>Installation</span></a></li><li><ul><li><a href="#using-npm"><span>Using npm</span></a></li><li><a href="#using-docker"><span>Using <wbr/>Docker</span></a></li><li><a href="#from-source"><span>From <wbr/>Source</span></a></li></ul></li><li><a href="#🏃-quick-start"><span>🏃 <wbr/>Quick <wbr/>Start</span></a></li><li><a href="#⚙️-configuration"><span>⚙️ <wbr/>Configuration</span></a></li><li><ul><li><a href="#environment-variables"><span>Environment <wbr/>Variables</span></a></li><li><a href="#advanced-configuration"><span>Advanced <wbr/>Configuration</span></a></li></ul></li><li><a href="#🏗️-architecture"><span>🏗️ <wbr/>Architecture</span></a></li><li><ul><li><a href="#directory-structure"><span>Directory <wbr/>Structure</span></a></li><li><a href="#key-components"><span>Key <wbr/>Components</span></a></li></ul></li><li><a href="#📚-api-reference"><span>📚 API <wbr/>Reference</span></a></li><li><ul><li><a href="#tools"><span>Tools</span></a></li><li><ul><li><a href="#orders--returns"><span>Orders &amp; <wbr/>Returns</span></a></li><li><a href="#inventory--products"><span>Inventory &amp; <wbr/>Products</span></a></li><li><a href="#financial"><span>Financial</span></a></li></ul></li><li><a href="#resources"><span>Resources</span></a></li><li><a href="#prompts"><span>Prompts</span></a></li></ul></li><li><a href="#🛠️-development"><span>🛠️ <wbr/>Development</span></a></li><li><ul><li><a href="#prerequisites"><span>Prerequisites</span></a></li><li><a href="#setup"><span>Setup</span></a></li><li><a href="#project-scripts"><span>Project <wbr/>Scripts</span></a></li></ul></li><li><a href="#🧪-testing"><span>🧪 <wbr/>Testing</span></a></li><li><ul><li><a href="#running-tests"><span>Running <wbr/>Tests</span></a></li><li><a href="#test-structure"><span>Test <wbr/>Structure</span></a></li><li><a href="#writing-tests"><span>Writing <wbr/>Tests</span></a></li></ul></li><li><a href="#🚀-deployment"><span>🚀 <wbr/>Deployment</span></a></li><li><ul><li><a href="#docker-deployment"><span>Docker <wbr/>Deployment</span></a></li><li><a href="#kubernetes-deployment"><span>Kubernetes <wbr/>Deployment</span></a></li><li><a href="#cloud-deployment"><span>Cloud <wbr/>Deployment</span></a></li></ul></li><li><a href="#📊-monitoring"><span>📊 <wbr/>Monitoring</span></a></li><li><ul><li><a href="#health-checks"><span>Health <wbr/>Checks</span></a></li><li><a href="#metrics"><span>Metrics</span></a></li><li><a href="#logging"><span>Logging</span></a></li></ul></li><li><a href="#🤝-contributing"><span>🤝 <wbr/>Contributing</span></a></li><li><ul><li><a href="#development-workflow"><span>Development <wbr/>Workflow</span></a></li><li><a href="#code-standards"><span>Code <wbr/>Standards</span></a></li></ul></li><li><a href="#📄-license"><span>📄 <wbr/>License</span></a></li><li><a href="#🙏-acknowledgments"><span>🙏 <wbr/>Acknowledgments</span></a></li><li><a href="#📞-support"><span>📞 <wbr/>Support</span></a></li></ul></div></details></div><div class="site-menu"><nav id="tsd-sidebar-links" class="tsd-navigation"><a href="https://github.com/stateset/mcp-server" class="tsd-nav-link">GitHub</a><a href="https://docs.stateset.io" class="tsd-nav-link">Documentation</a></nav><nav class="tsd-navigation"><a href="modules.html">StateSet MCP Server API Documentation - v1.0.0</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>

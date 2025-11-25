@@ -1,10 +1,41 @@
 import { Tool, ResourceTemplate, Prompt } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import * as schemas from './schemas';
 import { batchTools } from './batch-operations';
 import { searchTools } from './search-tools';
 
+type ToolDefinition = Omit<Tool, 'inputSchema'> & { inputSchema?: any };
+
+const normalizeInputSchema = (schema: any) => {
+  if (!schema) {
+    return { type: 'object', properties: {} };
+  }
+
+  // Already JSON Schema
+  if (schema.type) {
+    return schema;
+  }
+
+  // Full Zod schema
+  if (schema._def) {
+    return zodToJsonSchema(schema as z.ZodTypeAny, { $refStrategy: 'none' });
+  }
+
+  // Zod shape object (e.g., schema.shape)
+  if (
+    typeof schema === 'object' &&
+    Object.values(schema).every((value) => value && typeof value === 'object' && '_def' in value)
+  ) {
+    const zodSchema = z.object(schema as Record<string, z.ZodTypeAny>);
+    return zodToJsonSchema(zodSchema, { $refStrategy: 'none' });
+  }
+
+  return schema;
+};
+
 // Tool Definitions with comprehensive descriptions for AI understanding
-export const tools: Tool[] = [
+const toolDefinitions: ToolDefinition[] = [
   // ===================
   // CREATE OPERATIONS
   // ===================
@@ -661,6 +692,11 @@ export const tools: Tool[] = [
   // Search operations
   ...searchTools,
 ];
+
+export const tools: Tool[] = toolDefinitions.map(({ inputSchema, ...tool }) => ({
+  ...tool,
+  inputSchema: normalizeInputSchema(inputSchema),
+}));
 
 // Resource Templates
 export const resourceTemplates: ResourceTemplate[] = [

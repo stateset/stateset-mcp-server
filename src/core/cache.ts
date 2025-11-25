@@ -248,6 +248,7 @@ function createCacheStrategy<T>(strategy: string, maxSize: number): CacheStrateg
 export class CacheManager {
   private caches: Map<string, CacheStrategy<any>> = new Map();
   private warmupFunctions: Map<string, () => Promise<void>> = new Map();
+  private cleanupTimer?: NodeJS.Timeout;
 
   constructor() {
     // Start periodic cleanup
@@ -369,7 +370,8 @@ export class CacheManager {
 
   // Periodic cleanup of expired entries
   private startCleanupTimer(): void {
-    setInterval(() => {
+    this.stopCleanupTimer();
+    this.cleanupTimer = setInterval(() => {
       for (const [namespace, cache] of this.caches.entries()) {
         const beforeCount = cache.getStats().itemCount;
         // Trigger cleanup by attempting to get all keys
@@ -385,6 +387,16 @@ export class CacheManager {
         }
       }
     }, 60000); // Run every minute
+
+    // Do not keep the process alive solely for cleanup
+    this.cleanupTimer.unref?.();
+  }
+
+  stopCleanupTimer(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = undefined;
+    }
   }
 }
 
