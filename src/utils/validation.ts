@@ -134,6 +134,50 @@ export function validateNoSqlInjection(input: string): void {
   for (const pattern of sqlPatterns) {
     if (pattern.test(input)) {
       throw new Error('Potentially malicious input detected');
+        }
+      }
     }
-  }
-}
+    
+    /**
+     * Sanitize and validate tool arguments for security
+     * @param args The raw arguments from the tool call
+     * @param toolName The name of the tool being called
+     * @returns Sanitized arguments
+     */
+    export function sanitizeToolArguments(args: Record<string, unknown>, toolName: string): Record<string, unknown> {
+      const sanitized: Record<string, unknown> = {};
+    
+      for (const [key, value] of Object.entries(args)) {
+        if (typeof value === 'string') {
+          // Validate content length
+          validateContentLength(value, 50000);
+    
+          // Check for SQL injection patterns in text fields
+          if (key.includes('note') || key.includes('description') || key.includes('comment')) {
+            validateNoSqlInjection(value);
+          }
+    
+          // Sanitize string values
+          sanitized[key] = sanitizeString(value);
+        } else if (Array.isArray(value)) {
+          // Recursively sanitize array items
+          sanitized[key] = value.map((item: unknown) => {
+            if (typeof item === 'object' && item !== null) {
+              return sanitizeToolArguments(item as Record<string, unknown>, toolName);
+            }
+            if (typeof item === 'string') {
+              return sanitizeString(item);
+            }
+            return item;
+          });
+        } else if (typeof value === 'object' && value !== null) {
+          // Recursively sanitize nested objects
+          sanitized[key] = sanitizeToolArguments(value as Record<string, unknown>, toolName);
+        } else {
+          sanitized[key] = value;
+        }
+      }
+    
+      return sanitized;
+    }
+    
