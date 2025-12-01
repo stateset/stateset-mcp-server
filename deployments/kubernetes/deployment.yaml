@@ -1,0 +1,248 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stateset-mcp-server
+  labels:
+    app: stateset-mcp-server
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: stateset-mcp-server
+  template:
+    metadata:
+      labels:
+        app: stateset-mcp-server
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9464"
+        prometheus.io/path: "/metrics"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - stateset-mcp-server
+                topologyKey: kubernetes.io/hostname
+
+      containers:
+        - name: mcp-server
+          image: stateset/mcp-server:latest
+          imagePullPolicy: Always
+
+          ports:
+            - name: websocket
+              containerPort: 8081
+              protocol: TCP
+            - name: metrics
+              containerPort: 9464
+              protocol: TCP
+
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: LOG_LEVEL
+              value: "info"
+
+            # API Configuration
+            - name: STATESET_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: stateset-secrets
+                  key: api-key
+            - name: STATESET_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: stateset-config
+                  key: api-base-url
+
+            # Redis Configuration
+            - name: REDIS_ENABLED
+              value: "true"
+            - name: REDIS_HOST
+              value: "redis-service"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: CACHE_BACKEND
+              value: "hybrid"
+            - name: REDIS_HYBRID_L1_SIZE
+              value: "1000"
+            - name: REDIS_HYBRID_L1_TTL
+              value: "60"
+
+            # Rate Limiting
+            - name: REQUESTS_PER_HOUR
+              value: "10000"
+            - name: REQUESTS_PER_MINUTE
+              value: "500"
+
+            # Feature Flags
+            - name: FEATURE_WEBSOCKET
+              value: "true"
+            - name: FEATURE_METRICS
+              value: "true"
+            - name: FEATURE_HEALTH_CHECK
+              value: "true"
+            - name: FEATURE_CIRCUIT_BREAKER
+              value: "true"
+
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9464
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 9464
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 9464
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+
+          volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: logs
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+
+      terminationGracePeriodSeconds: 30
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stateset-mcp-service
+  labels:
+    app: stateset-mcp-server
+spec:
+  type: ClusterIP
+  ports:
+    - name: websocket
+      port: 8081
+      targetPort: 8081
+      protocol: TCP
+    - name: metrics
+      port: 9464
+      targetPort: 9464
+      protocol: TCP
+  selector:
+    app: stateset-mcp-server
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stateset-config
+data:
+  api-base-url: "https://api.stateset.io/v1"
+  cache-strategy: "lru"
+  cache-ttl: "300"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: stateset-secrets
+type: Opaque
+stringData:
+  api-key: "your-api-key-here"  # Replace with actual API key or use external secrets
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: stateset-mcp-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: stateset-mcp-server
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+      selectPolicy: Max
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: stateset-mcp-pdb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: stateset-mcp-server
