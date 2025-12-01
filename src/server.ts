@@ -11,7 +11,7 @@ import {
 import { z } from 'zod';
 import dotenv from 'dotenv';
 import { logger } from './utils/logger';
-import { tools, resourceTemplates, serverPrompt } from './tools/definitions';
+import { tools, resourceTemplates } from './tools/definitions';
 import { handleError } from './middleware/error-handler';
 import { wsManager } from './core/websocket';
 import { cacheManager } from './core/cache';
@@ -58,8 +58,7 @@ async function main(): Promise<void> {
       { name: 'stateset-mcp-server', version: '1.0.0' },
       {
         capabilities: {
-          prompts: { default: serverPrompt },
-          resources: { templates: true, read: true },
+          resources: {},
           tools: {},
         },
       },

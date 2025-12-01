@@ -1,4 +1,4 @@
-import { Tool, ResourceTemplate, Prompt } from '@modelcontextprotocol/sdk/types.js';
+import { Tool, ResourceTemplate } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import * as schemas from './schemas';
@@ -707,175 +707,56 @@ export const resourceTemplates: ResourceTemplate[] = [
     uriTemplate: 'stateset-rma:///{rmaId}',
     name: 'StateSet RMA',
     description: 'RMA record',
-    parameters: { rmaId: { type: 'string', description: 'RMA ID' } },
-    examples: ['stateset-rma:///12345'],
   },
   {
     uriTemplate: 'stateset-order:///{orderId}',
     name: 'StateSet Order',
     description: 'Order record',
-    parameters: { orderId: { type: 'string', description: 'Order ID' } },
-    examples: ['stateset-order:///ORD-123'],
   },
   {
     uriTemplate: 'stateset-warranty:///{warrantyId}',
     name: 'StateSet Warranty',
     description: 'Warranty record',
-    parameters: { warrantyId: { type: 'string', description: 'Warranty ID' } },
-    examples: ['stateset-warranty:///WAR-123'],
   },
   {
     uriTemplate: 'stateset-shipment:///{shipmentId}',
     name: 'StateSet Shipment',
     description: 'Shipment record',
-    parameters: { shipmentId: { type: 'string', description: 'Shipment ID' } },
-    examples: ['stateset-shipment:///SHIP-123'],
   },
   {
     uriTemplate: 'stateset-product:///{productId}',
     name: 'StateSet Product',
     description: 'Product record',
-    parameters: { productId: { type: 'string', description: 'Product ID' } },
-    examples: ['stateset-product:///PROD-123'],
   },
   {
     uriTemplate: 'stateset-inventory:///{inventoryId}',
     name: 'StateSet Inventory',
     description: 'Inventory record',
-    parameters: { inventoryId: { type: 'string', description: 'Inventory ID' } },
-    examples: ['stateset-inventory:///INV-123'],
   },
   {
     uriTemplate: 'stateset-customer:///{customerId}',
     name: 'StateSet Customer',
     description: 'Customer record',
-    parameters: { customerId: { type: 'string', description: 'Customer ID' } },
-    examples: ['stateset-customer:///CUST-123'],
   },
   {
     uriTemplate: 'stateset-sales-order:///{salesOrderId}',
     name: 'StateSet Sales Order',
     description: 'Sales Order record',
-    parameters: { salesOrderId: { type: 'string', description: 'Sales Order ID' } },
-    examples: ['stateset-sales-order:///SO-123'],
   },
   {
     uriTemplate: 'stateset-purchase-order:///{purchaseOrderId}',
     name: 'StateSet Purchase Order',
     description: 'Purchase Order record',
-    parameters: { purchaseOrderId: { type: 'string', description: 'Purchase Order ID' } },
-    examples: ['stateset-purchase-order:///PO-123'],
   },
   {
     uriTemplate: 'stateset-invoice:///{invoiceId}',
     name: 'StateSet Invoice',
     description: 'Invoice record',
-    parameters: { invoiceId: { type: 'string', description: 'Invoice ID' } },
-    examples: ['stateset-invoice:///INV-123'],
   },
   {
     uriTemplate: 'stateset-payment:///{paymentId}',
     name: 'StateSet Payment',
     description: 'Payment record',
-    parameters: { paymentId: { type: 'string', description: 'Payment ID' } },
-    examples: ['stateset-payment:///PAY-123'],
   },
 ];
 
-// Server Prompt
-export const serverPrompt: Prompt = {
-  name: 'stateset-server-prompt',
-  description: 'StateSet MCP server instructions',
-  instructions: `StateSet MCP Server - Enterprise eCommerce Operations Platform
-
-This server provides comprehensive tools for managing eCommerce operations through the StateSet API.
-
-=== CORE CAPABILITIES ===
-
-📦 Orders & Returns
-  - stateset_create_order: Create new customer orders with items and shipping
-  - stateset_update_order: Modify order status, addresses, and details
-  - stateset_delete_order: Remove orders from the system
-  - stateset_get_order: Retrieve order details by ID
-  - stateset_list_orders: List all orders with pagination
-  - stateset_create_rma: Create return merchandise authorization
-  - stateset_approve_return: Approve pending return requests
-  - stateset_restock_return: Restock inventory from approved returns
-
-🚚 Fulfillment & Shipping
-  - stateset_create_shipment: Create shipment records
-  - stateset_mark_shipment_shipped: Update shipment to shipped status
-  - stateset_mark_shipment_delivered: Mark shipment as delivered
-  - stateset_list_shipments: List all shipments
-
-📋 Manufacturing & Supply Chain
-  - stateset_create_work_order: Create manufacturing work orders
-  - stateset_create_bill_of_materials: Define component requirements
-  - stateset_create_purchase_order: Create vendor purchase orders
-  - stateset_create_asn: Create advance shipping notices
-  - stateset_create_manufacturer_order: Orders to manufacturers
-
-📦 Inventory & Products
-  - stateset_create_product: Add new products to catalog
-  - stateset_update_product: Modify product details and pricing
-  - stateset_create_inventory: Set up inventory tracking
-  - stateset_update_inventory: Adjust inventory levels
-  - stateset_list_products: List all products
-  - stateset_list_inventories: View inventory across locations
-
-💰 Financial
-  - stateset_create_invoice: Generate customer invoices
-  - stateset_create_payment: Record payment transactions
-  - stateset_create_cash_sale: Direct cash sales
-  - stateset_list_invoices: List all invoices
-  - stateset_list_payments: View payment history
-
-👤 Customers
-  - stateset_create_customer: Add new customer records
-  - stateset_update_customer: Update customer information
-  - stateset_list_customers: List all customers
-
-🔍 Advanced Search
-  - stateset_advanced_search: Search with filters, sorting, pagination
-  - stateset_search_orders_by_date: Find orders in date ranges
-  - stateset_search_products_with_inventory: Search products by stock
-  - stateset_search_customer_analytics: Analyze customer segments
-  - stateset_full_text_search: Search across all resources
-
-⚡ Batch Operations
-  - stateset_batch_operations: Execute multiple operations atomically
-  - stateset_batch_create_orders: Create many orders at once
-  - stateset_batch_update_inventory: Bulk inventory adjustments
-  - stateset_csv_import: Import data from CSV files
-
-📊 Monitoring & Health
-  - stateset_health_check: Check server and API health status
-  - stateset_get_api_metrics: View rate limiter and request metrics
-
-=== BEST PRACTICES ===
-
-1. Input Validation
-   - All inputs are sanitized and validated
-   - Use UUIDs for IDs where required
-   - Check email formats for customer fields
-
-2. Rate Limiting
-   - Server implements automatic rate limiting
-   - Use batch operations for bulk updates
-   - Check metrics to monitor API usage
-
-3. Error Handling
-   - Errors include detailed context
-   - Retry logic is built into the client
-   - Use health check to diagnose issues
-
-4. Search & Filtering
-   - Use advanced search for complex queries
-   - Apply filters to reduce result sets
-   - Enable aggregations for analytics
-
-5. Batch Processing
-   - Group related operations together
-   - Use parallel mode for independent operations
-   - Set stopOnError for critical workflows`,
-};
