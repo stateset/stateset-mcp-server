@@ -15,6 +15,7 @@ describe('CircuitBreaker', () => {
 
   afterEach(() => {
     circuitBreaker.reset();
+    circuitBreaker.destroy();
   });
 
   describe('initial state', () => {

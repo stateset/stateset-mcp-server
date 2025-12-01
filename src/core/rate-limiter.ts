@@ -57,6 +57,7 @@ abstract class RateLimiterStrategy extends EventEmitter {
   abstract canProceed(): boolean;
   abstract consume(): void;
   abstract getMetrics(): RateLimiterMetrics;
+  abstract destroy(): void;
 }
 
 // Token Bucket Strategy
@@ -65,6 +66,7 @@ class TokenBucketStrategy extends RateLimiterStrategy {
   private readonly maxTokens: number;
   private refillRate: number;
   private lastRefill: number;
+  private refillInterval?: NodeJS.Timeout;
 
   constructor(maxTokens: number, refillRate: number) {
     super();
@@ -111,10 +113,19 @@ class TokenBucketStrategy extends RateLimiterStrategy {
   }
 
   private startRefillTimer(): void {
-    setInterval(() => {
+    this.refillInterval = setInterval(() => {
       this.refill();
       this.emit('refill', this.tokens);
     }, 1000);
+    // Prevent interval from keeping process alive
+    this.refillInterval.unref();
+  }
+
+  destroy(): void {
+    if (this.refillInterval) {
+      clearInterval(this.refillInterval);
+      this.refillInterval = undefined;
+    }
   }
 
   private updateMetrics(): void {
@@ -135,6 +146,7 @@ class SlidingWindowStrategy extends RateLimiterStrategy {
   private readonly windowSize: number;
   private readonly maxRequests: number;
   private requests: number[] = [];
+  private cleanupInterval?: NodeJS.Timeout;
 
   constructor(windowSize: number, maxRequests: number) {
     super();
@@ -178,10 +190,19 @@ class SlidingWindowStrategy extends RateLimiterStrategy {
   }
 
   private startCleanupTimer(): void {
-    setInterval(() => {
+    this.cleanupInterval = setInterval(() => {
       this.cleanup();
       this.emit('cleanup', this.requests.length);
     }, 1000);
+    // Prevent interval from keeping process alive
+    this.cleanupInterval.unref();
+  }
+
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
   }
 
   private updateMetrics(): void {
@@ -195,6 +216,7 @@ class AdaptiveStrategy extends RateLimiterStrategy {
   private responseTimes: number[] = [];
   private readonly targetResponseTime: number;
   private readonly adjustmentFactor: number;
+  private adjustmentInterval?: NodeJS.Timeout;
 
   constructor(
     initialTokens: number,
@@ -253,9 +275,20 @@ class AdaptiveStrategy extends RateLimiterStrategy {
   }
 
   private startAdjustmentTimer(): void {
-    setInterval(() => {
+    this.adjustmentInterval = setInterval(() => {
       this.adjustRate();
     }, 5000);
+    // Prevent interval from keeping process alive
+    this.adjustmentInterval.unref();
+  }
+
+  destroy(): void {
+    if (this.adjustmentInterval) {
+      clearInterval(this.adjustmentInterval);
+      this.adjustmentInterval = undefined;
+    }
+    // Also destroy the token bucket
+    this.tokenBucket.destroy();
   }
 }
 
@@ -461,6 +494,12 @@ export class RateLimiter {
     this.queue = [];
 
     logger.info('Rate limiter queue cleared', { clearedCount });
+  }
+
+  // Destroy and clean up resources
+  destroy(): void {
+    this.clearQueue();
+    this.strategy.destroy();
   }
 }
 

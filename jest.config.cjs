@@ -72,6 +72,4 @@ module.exports = {
   verbose: true,
   // Detect open handles to identify resource leaks
   detectOpenHandles: false, // Disabled for performance, enable for debugging
-  // Force exit after tests complete (prevents hanging on open handles)
-  forceExit: true,
 }; 

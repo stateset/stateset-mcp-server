@@ -444,8 +444,7 @@ export class StateSetMCPClient {
       'mfgorders',
       async () => {
         const response = await this.executeWithProtection(
-          (config) =>
-            this.apiClient.get(`/manufacturer-orders/${manufacturerOrderId}`, config),
+          (config) => this.apiClient.get(`/manufacturer-orders/${manufacturerOrderId}`, config),
           'getManufacturerOrder',
         );
         return this.enrichResponse(response.data);
@@ -537,8 +536,7 @@ export class StateSetMCPClient {
 
   async updatePurchaseOrder(args: UpdatePurchaseOrderArgs): Promise<StateSetResponse> {
     const response = await this.executeWithProtection(
-      (config) =>
-        this.apiClient.patch(`/purchase-orders/${args.purchase_order_id}`, args, config),
+      (config) => this.apiClient.patch(`/purchase-orders/${args.purchase_order_id}`, args, config),
       'updatePurchaseOrder',
     );
     return this.enrichResponse(response.data);
@@ -705,8 +703,7 @@ export class StateSetMCPClient {
 
   async deleteFulfillmentOrder(args: DeleteFulfillmentOrderArgs): Promise<StateSetResponse> {
     const response = await this.executeWithProtection(
-      (config) =>
-        this.apiClient.delete(`/fulfillment-orders/${args.fulfillment_order_id}`, config),
+      (config) => this.apiClient.delete(`/fulfillment-orders/${args.fulfillment_order_id}`, config),
       'deleteFulfillmentOrder',
     );
     return this.enrichResponse(response.data);
@@ -890,8 +887,7 @@ export class StateSetMCPClient {
 
   async deleteBillOfMaterials(args: DeleteBillOfMaterialsArgs): Promise<StateSetResponse> {
     const response = await this.executeWithProtection(
-      (config) =>
-        this.apiClient.delete(`/bill-of-materials/${args.bill_of_materials_id}`, config),
+      (config) => this.apiClient.delete(`/bill-of-materials/${args.bill_of_materials_id}`, config),
       'deleteBillOfMaterials',
     );
     return this.enrichResponse(response.data);

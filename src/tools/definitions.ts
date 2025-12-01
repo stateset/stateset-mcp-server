@@ -35,7 +35,7 @@ const normalizeInputSchema = (schema: any) => {
 };
 
 // Tool Definitions with comprehensive descriptions for AI understanding
-const toolDefinitions: ToolDefinition[] = [
+const toolDefinitions: (ToolDefinition | Tool)[] = [
   // ===================
   // CREATE OPERATIONS
   // ===================
@@ -693,10 +693,13 @@ const toolDefinitions: ToolDefinition[] = [
   ...searchTools,
 ];
 
-export const tools: Tool[] = toolDefinitions.map(({ inputSchema, ...tool }) => ({
-  ...tool,
-  inputSchema: normalizeInputSchema(inputSchema),
-}));
+export const tools: Tool[] = toolDefinitions.map(
+  ({ inputSchema, ...tool }): Tool =>
+    ({
+      ...tool,
+      inputSchema: normalizeInputSchema(inputSchema),
+    }) as Tool,
+);
 
 // Resource Templates
 export const resourceTemplates: ResourceTemplate[] = [

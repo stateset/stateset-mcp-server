@@ -123,14 +123,14 @@ async function main(): Promise<void> {
 
       try {
         // Close WebSocket connections
-      logger.info('Closing WebSocket connections...');
-      wsManager.stop();
+        logger.info('Closing WebSocket connections...');
+        wsManager.stop();
 
-      // Clear caches
-      logger.info('Stopping cache cleanup tasks...');
-      cacheManager.stopCleanupTimer();
-      logger.info('Clearing caches...');
-      cacheManager.clear();
+        // Clear caches
+        logger.info('Stopping cache cleanup tasks...');
+        cacheManager.stopCleanupTimer();
+        logger.info('Clearing caches...');
+        cacheManager.clear();
 
         // Close server transport
         logger.info('Closing server transport...');

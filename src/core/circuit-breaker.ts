@@ -55,6 +55,7 @@ export class CircuitBreaker extends EventEmitter {
   private readonly options: Required<CircuitBreakerOptions>;
   private halfOpenRequests: number = 0;
   private readonly maxHalfOpenRequests: number = 1;
+  private monitoringInterval?: NodeJS.Timeout;
 
   constructor(
     private readonly name: string,
@@ -298,7 +299,7 @@ export class CircuitBreaker extends EventEmitter {
 
   private startMonitoring(): void {
     // Periodic metrics emission
-    setInterval(() => {
+    this.monitoringInterval = setInterval(() => {
       const metrics = this.getMetrics();
       this.emit('metrics', metrics);
 
@@ -306,6 +307,19 @@ export class CircuitBreaker extends EventEmitter {
         state: metrics.state,
       });
     }, 30000); // Every 30 seconds
+
+    // Prevent the interval from keeping the process alive
+    this.monitoringInterval.unref();
+  }
+
+  /**
+   * Clean up resources (stop monitoring interval)
+   */
+  destroy(): void {
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+      this.monitoringInterval = undefined;
+    }
   }
 
   // Public methods
@@ -412,6 +426,16 @@ export class CircuitBreakerManager {
         breaker.reset();
       }
     }
+  }
+
+  /**
+   * Destroy all circuit breakers and clean up resources
+   */
+  destroy(): void {
+    for (const breaker of this.breakers.values()) {
+      breaker.destroy();
+    }
+    this.breakers.clear();
   }
 
   private handleBreakerOpen(data: { name: string }): void {
