@@ -1099,6 +1099,366 @@ const toolDefinitions: (ToolDefinition | Tool)[] = [
 
   // Search operations
   ...searchTools,
+
+  // =======================
+  // USER OPERATIONS
+  // =======================
+  {
+    name: 'stateset_list_users',
+    description:
+      'Lists all users with pagination. Returns user details including roles and permissions. Use for user management and access control.',
+    inputSchema: schemas.ListArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_user',
+    description:
+      'Retrieves a user by ID. Returns full user profile including roles, permissions, and activity.',
+    inputSchema: schemas.GetUserArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_create_user',
+    description:
+      'Creates a new user account. Requires email, name, role, and password. Roles: admin, manager, operator, viewer.',
+    inputSchema: schemas.CreateUserArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_update_user',
+    description:
+      'Updates user information. Can modify email, name, and role. Cannot change password - use change_password instead.',
+    inputSchema: schemas.UpdateUserArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_delete_user',
+    description:
+      'Deletes a user account. WARNING: This is permanent. Consider deactivating instead if the user may need to be restored.',
+    inputSchema: schemas.DeleteUserArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_change_password',
+    description:
+      'Changes a user\'s password. Requires current password for verification. New password must be at least 8 characters.',
+    inputSchema: schemas.ChangePasswordArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_user_profile',
+    description:
+      'Retrieves the current authenticated user\'s profile. Returns user details, permissions, and preferences.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+
+  // =======================
+  // NOTIFICATION OPERATIONS
+  // =======================
+  {
+    name: 'stateset_list_notifications',
+    description:
+      'Lists notifications for the current user. Can filter by read/unread status. Returns notification summaries with timestamps.',
+    inputSchema: schemas.ListNotificationsArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_notification',
+    description:
+      'Retrieves a notification by ID. Returns full notification details including message and metadata.',
+    inputSchema: schemas.GetNotificationArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_mark_notification_read',
+    description:
+      'Marks a notification as read. Use when the user has viewed the notification.',
+    inputSchema: schemas.MarkNotificationReadArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_mark_notification_unread',
+    description:
+      'Marks a notification as unread. Use to flag a notification for later follow-up.',
+    inputSchema: schemas.MarkNotificationUnreadArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_delete_notification',
+    description:
+      'Deletes a notification. Permanently removes the notification from the user\'s inbox.',
+    inputSchema: schemas.DeleteNotificationArgsSchema.shape as any,
+  },
+
+  // =======================
+  // REPORT OPERATIONS
+  // =======================
+  {
+    name: 'stateset_get_order_report',
+    description:
+      'Generates an order summary report. Filter by date range and status. Group by day, week, month, status, or customer. Returns aggregated metrics.',
+    inputSchema: schemas.GetOrderReportArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_inventory_report',
+    description:
+      'Generates an inventory report. Filter by location and stock thresholds. Returns stock levels, values, and reorder recommendations.',
+    inputSchema: schemas.GetInventoryReportArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_returns_report',
+    description:
+      'Generates a returns report. Filter by date range and status. Group by day, week, month, reason, or status. Returns return rate and trends.',
+    inputSchema: schemas.GetReturnsReportArgsSchema.shape as any,
+  },
+
+  // =======================
+  // CHECKOUT EXTENDED OPERATIONS
+  // =======================
+  {
+    name: 'stateset_update_checkout_customer',
+    description:
+      'Updates customer information on a checkout session. Can set customer_id to link to existing customer or provide guest details.',
+    inputSchema: schemas.UpdateCheckoutCustomerArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_update_checkout_shipping',
+    description:
+      'Updates shipping details on a checkout session. Set shipping address and optionally change shipping method.',
+    inputSchema: schemas.UpdateCheckoutShippingArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_update_checkout_payment',
+    description:
+      'Updates payment information on a checkout session. Set payment method and optionally update billing address.',
+    inputSchema: schemas.UpdateCheckoutPaymentArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_apply_checkout_coupon',
+    description:
+      'Applies a coupon code to a checkout session. Validates the coupon and applies any applicable discounts.',
+    inputSchema: schemas.ApplyCheckoutCouponArgsSchema.shape as any,
+  },
+
+  // =======================
+  // AGENTIC CHECKOUT OPERATIONS
+  // =======================
+  {
+    name: 'stateset_create_agentic_checkout',
+    description:
+      'Creates an AI-powered agentic checkout session. Enables natural language interaction for checkout. Optionally link to existing customer.',
+    inputSchema: schemas.CreateAgenticCheckoutArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_agentic_checkout',
+    description:
+      'Retrieves an agentic checkout session. Returns session state, cart contents, and conversation history.',
+    inputSchema: schemas.GetAgenticCheckoutArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_process_natural_language',
+    description:
+      'Processes natural language input for an agentic checkout session. Use for conversational checkout interactions.',
+    inputSchema: schemas.ProcessNaturalLanguageArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_agentic_recommendations',
+    description:
+      'Gets AI recommendations for an agentic checkout session. Types: products, shipping, payment, upsell, cross_sell.',
+    inputSchema: schemas.GetAgenticRecommendationsArgsSchema.shape as any,
+  },
+
+  // =======================
+  // ORDER EXTENDED OPERATIONS
+  // =======================
+  {
+    name: 'stateset_get_order_by_number',
+    description:
+      'Retrieves an order by order number (not ID). Use when you have the human-readable order number instead of the UUID.',
+    inputSchema: schemas.GetOrderByNumberArgsSchema.shape as any,
+  },
+
+  // =======================
+  // MANUFACTURING OPERATIONS
+  // =======================
+  {
+    name: 'stateset_create_robot_serial',
+    description:
+      'Creates a new robot serial number record. Tracks individual robot units through manufacturing and deployment.',
+    inputSchema: schemas.CreateRobotSerialArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_robot_serial',
+    description:
+      'Retrieves a robot serial record by ID. Returns manufacturing details, status, and component history.',
+    inputSchema: schemas.GetRobotSerialArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_list_robot_serials',
+    description:
+      'Lists all robot serial records with pagination. Filter by status, model, or date range.',
+    inputSchema: schemas.ListArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_update_robot_serial',
+    description:
+      'Updates a robot serial record. Change status as robot moves through production, testing, and deployment.',
+    inputSchema: schemas.UpdateRobotSerialArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_delete_robot_serial',
+    description:
+      'Deletes a robot serial record. WARNING: Only delete records created in error. Deployed units should not be deleted.',
+    inputSchema: schemas.DeleteRobotSerialArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_create_component_serial',
+    description:
+      'Creates a component serial number record. Tracks individual components for traceability and warranty.',
+    inputSchema: schemas.CreateComponentSerialArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_component_serial',
+    description:
+      'Retrieves a component serial record. Returns component details, installation history, and status.',
+    inputSchema: schemas.GetComponentSerialArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_update_component_serial',
+    description:
+      'Updates a component serial record. Use to update status or add notes.',
+    inputSchema: schemas.UpdateComponentSerialArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_install_component',
+    description:
+      'Records installation of a component into a robot. Links component to robot serial for traceability.',
+    inputSchema: schemas.InstallComponentArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_remove_component',
+    description:
+      'Records removal of a component from a robot. Specify reason for removal (replacement, failure, upgrade).',
+    inputSchema: schemas.RemoveComponentArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_create_test_protocol',
+    description:
+      'Creates a test protocol definition. Define steps, expected results, and pass criteria for quality assurance.',
+    inputSchema: schemas.CreateTestProtocolArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_test_protocol',
+    description:
+      'Retrieves a test protocol by ID. Returns all steps and criteria for test execution.',
+    inputSchema: schemas.GetTestProtocolArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_create_test_result',
+    description:
+      'Records test results for a robot. Document step-by-step results and overall pass/fail status.',
+    inputSchema: schemas.CreateTestResultArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_test_result',
+    description:
+      'Retrieves test results by ID. Returns all step results, tester info, and overall status.',
+    inputSchema: schemas.GetTestResultArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_create_ncr',
+    description:
+      'Creates a Non-Conformance Report (NCR). Document quality issues found during manufacturing or testing.',
+    inputSchema: schemas.CreateNCRArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_ncr',
+    description:
+      'Retrieves an NCR by ID. Returns issue details, severity, and resolution status.',
+    inputSchema: schemas.GetNCRArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_close_ncr',
+    description:
+      'Closes an NCR with resolution. Document how the non-conformance was addressed.',
+    inputSchema: schemas.CloseNCRArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_create_certification',
+    description:
+      'Creates a certification record for a robot. Document quality certifications and compliance.',
+    inputSchema: schemas.CreateCertificationArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_certification',
+    description:
+      'Retrieves a certification record. Returns certification type, certifier, and validity period.',
+    inputSchema: schemas.GetCertificationArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_create_service_record',
+    description:
+      'Creates a service record for a robot. Document maintenance, repairs, upgrades, or inspections.',
+    inputSchema: schemas.CreateServiceRecordArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_service_record',
+    description:
+      'Retrieves a service record. Returns service details, technician, and parts used.',
+    inputSchema: schemas.GetServiceRecordArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_complete_service_record',
+    description:
+      'Marks a service record as complete. Add completion notes and finalize the service.',
+    inputSchema: schemas.CompleteServiceRecordArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_record_production_metrics',
+    description:
+      'Records production metrics for a production line. Track units produced, pass/fail rates, and efficiency.',
+    inputSchema: schemas.RecordProductionMetricsArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_production_metrics',
+    description:
+      'Retrieves production metrics. Filter by production line and date range for analysis.',
+    inputSchema: schemas.GetProductionMetricsArgsSchema.shape as any,
+  },
+
+  // =======================
+  // WORK ORDER EXTENDED OPERATIONS
+  // =======================
+  {
+    name: 'stateset_update_work_order_status',
+    description:
+      'Updates the status of a work order. Valid statuses: pending, scheduled, in_progress, on_hold, completed, cancelled.',
+    inputSchema: schemas.UpdateWorkOrderStatusArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_schedule_work_order',
+    description:
+      'Schedules a work order for production. Set start/end times and optionally assign to a work center.',
+    inputSchema: schemas.ScheduleWorkOrderArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_update_work_order_task',
+    description:
+      'Updates an individual task within a work order. Track task progress and completion.',
+    inputSchema: schemas.UpdateWorkOrderTaskArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_work_center_capacity',
+    description:
+      'Gets capacity information for a work center. Returns available slots and scheduled work orders.',
+    inputSchema: schemas.GetWorkCenterCapacityArgsSchema.shape as any,
+  },
+
+  // =======================
+  // CUSTOMER AUTH OPERATIONS
+  // =======================
+  {
+    name: 'stateset_customer_login',
+    description:
+      'Authenticates a customer with email and password. Returns auth token for customer portal access.',
+    inputSchema: schemas.CustomerLoginArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_customer_register',
+    description:
+      'Registers a new customer account. Creates customer profile with email, password, and name.',
+    inputSchema: schemas.CustomerRegisterArgsSchema.shape as any,
+  },
 ];
 
 export const tools: Tool[] = toolDefinitions.map(

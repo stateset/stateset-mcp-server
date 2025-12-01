@@ -1192,4 +1192,35 @@ export class StateSetMCPClient {
 
     return result;
   }
+
+  /**
+   * Generic request method for endpoints not covered by specific methods
+   * Supports GET, POST, PUT, PATCH, DELETE operations
+   */
+  async request<T = StateSetResponse>(
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+    path: string,
+    data?: Record<string, any>,
+  ): Promise<T> {
+    const operationName = `${method.toLowerCase()}:${path}`;
+
+    const response = await this.executeWithProtection(async (config) => {
+      switch (method) {
+        case 'GET':
+          return this.apiClient.get(path, { ...config, params: data });
+        case 'POST':
+          return this.apiClient.post(path, data, config);
+        case 'PUT':
+          return this.apiClient.put(path, data, config);
+        case 'PATCH':
+          return this.apiClient.patch(path, data, config);
+        case 'DELETE':
+          return this.apiClient.delete(path, { ...config, data });
+        default:
+          throw new Error(`Unsupported HTTP method: ${method}`);
+      }
+    }, operationName);
+
+    return this.enrichResponse(response.data) as T;
+  }
 }

@@ -846,3 +846,314 @@ toolHandlers.set('stateset_saved_search', async (_client, args) => {
     ],
   };
 });
+
+// ==================================
+// USER OPERATIONS
+// ==================================
+toolHandlers.set('stateset_list_users', async (client, args) => {
+  return await client.request('GET', '/users', schemas.ListArgsSchema.parse(args));
+});
+
+toolHandlers.set('stateset_get_user', async (client, args) => {
+  const parsedArgs = schemas.GetUserArgsSchema.parse(args);
+  return await client.request('GET', `/users/${parsedArgs.user_id}`);
+});
+
+toolHandlers.set('stateset_create_user', async (client, args) => {
+  const parsedArgs = schemas.CreateUserArgsSchema.parse(args);
+  return await client.request('POST', '/users', parsedArgs);
+});
+
+toolHandlers.set('stateset_update_user', async (client, args) => {
+  const parsedArgs = schemas.UpdateUserArgsSchema.parse(args);
+  const { user_id, ...data } = parsedArgs;
+  return await client.request('PUT', `/users/${user_id}`, data);
+});
+
+toolHandlers.set('stateset_delete_user', async (client, args) => {
+  const parsedArgs = schemas.DeleteUserArgsSchema.parse(args);
+  return await client.request('DELETE', `/users/${parsedArgs.user_id}`);
+});
+
+toolHandlers.set('stateset_change_password', async (client, args) => {
+  const parsedArgs = schemas.ChangePasswordArgsSchema.parse(args);
+  const { user_id, ...data } = parsedArgs;
+  return await client.request('POST', `/users/${user_id}/change-password`, data);
+});
+
+toolHandlers.set('stateset_get_user_profile', async (client, _args) => {
+  return await client.request('GET', '/users/profile');
+});
+
+// ==================================
+// NOTIFICATION OPERATIONS
+// ==================================
+toolHandlers.set('stateset_list_notifications', async (client, args) => {
+  return await client.request('GET', '/notifications', schemas.ListNotificationsArgsSchema.parse(args));
+});
+
+toolHandlers.set('stateset_get_notification', async (client, args) => {
+  const parsedArgs = schemas.GetNotificationArgsSchema.parse(args);
+  return await client.request('GET', `/notifications/${parsedArgs.notification_id}`);
+});
+
+toolHandlers.set('stateset_mark_notification_read', async (client, args) => {
+  const parsedArgs = schemas.MarkNotificationReadArgsSchema.parse(args);
+  return await client.request('POST', `/notifications/${parsedArgs.notification_id}/read`);
+});
+
+toolHandlers.set('stateset_mark_notification_unread', async (client, args) => {
+  const parsedArgs = schemas.MarkNotificationUnreadArgsSchema.parse(args);
+  return await client.request('POST', `/notifications/${parsedArgs.notification_id}/unread`);
+});
+
+toolHandlers.set('stateset_delete_notification', async (client, args) => {
+  const parsedArgs = schemas.DeleteNotificationArgsSchema.parse(args);
+  return await client.request('DELETE', `/notifications/${parsedArgs.notification_id}/delete`);
+});
+
+// ==================================
+// REPORT OPERATIONS
+// ==================================
+toolHandlers.set('stateset_get_order_report', async (client, args) => {
+  const parsedArgs = schemas.GetOrderReportArgsSchema.parse(args);
+  return await client.request('GET', '/reports/orders', parsedArgs);
+});
+
+toolHandlers.set('stateset_get_inventory_report', async (client, args) => {
+  const parsedArgs = schemas.GetInventoryReportArgsSchema.parse(args);
+  return await client.request('GET', '/reports/inventory', parsedArgs);
+});
+
+toolHandlers.set('stateset_get_returns_report', async (client, args) => {
+  const parsedArgs = schemas.GetReturnsReportArgsSchema.parse(args);
+  return await client.request('GET', '/reports/returns', parsedArgs);
+});
+
+// ==================================
+// CHECKOUT EXTENDED OPERATIONS
+// ==================================
+toolHandlers.set('stateset_update_checkout_customer', async (client, args) => {
+  const parsedArgs = schemas.UpdateCheckoutCustomerArgsSchema.parse(args);
+  const { checkout_id, ...data } = parsedArgs;
+  return await client.request('PUT', `/checkout/${checkout_id}/customer`, data);
+});
+
+toolHandlers.set('stateset_update_checkout_shipping', async (client, args) => {
+  const parsedArgs = schemas.UpdateCheckoutShippingArgsSchema.parse(args);
+  const { checkout_id, ...data } = parsedArgs;
+  return await client.request('PUT', `/checkout/${checkout_id}/shipping`, data);
+});
+
+toolHandlers.set('stateset_update_checkout_payment', async (client, args) => {
+  const parsedArgs = schemas.UpdateCheckoutPaymentArgsSchema.parse(args);
+  const { checkout_id, ...data } = parsedArgs;
+  return await client.request('PUT', `/checkout/${checkout_id}/payment`, data);
+});
+
+toolHandlers.set('stateset_apply_checkout_coupon', async (client, args) => {
+  const parsedArgs = schemas.ApplyCheckoutCouponArgsSchema.parse(args);
+  const { checkout_id, ...data } = parsedArgs;
+  return await client.request('POST', `/checkout/${checkout_id}/apply-coupon`, data);
+});
+
+// ==================================
+// AGENTIC CHECKOUT OPERATIONS
+// ==================================
+toolHandlers.set('stateset_create_agentic_checkout', async (client, args) => {
+  const parsedArgs = schemas.CreateAgenticCheckoutArgsSchema.parse(args);
+  return await client.request('POST', '/checkout/agentic', parsedArgs);
+});
+
+toolHandlers.set('stateset_get_agentic_checkout', async (client, args) => {
+  const parsedArgs = schemas.GetAgenticCheckoutArgsSchema.parse(args);
+  return await client.request('GET', `/checkout/agentic/${parsedArgs.session_id}`);
+});
+
+toolHandlers.set('stateset_process_natural_language', async (client, args) => {
+  const parsedArgs = schemas.ProcessNaturalLanguageArgsSchema.parse(args);
+  const { session_id, ...data } = parsedArgs;
+  return await client.request('POST', `/checkout/agentic/${session_id}/process-natural-language`, data);
+});
+
+toolHandlers.set('stateset_get_agentic_recommendations', async (client, args) => {
+  const parsedArgs = schemas.GetAgenticRecommendationsArgsSchema.parse(args);
+  const { session_id, ...data } = parsedArgs;
+  return await client.request('POST', `/checkout/agentic/${session_id}/get-recommendations`, data);
+});
+
+// ==================================
+// ORDER EXTENDED OPERATIONS
+// ==================================
+toolHandlers.set('stateset_get_order_by_number', async (client, args) => {
+  const parsedArgs = schemas.GetOrderByNumberArgsSchema.parse(args);
+  return await client.request('GET', `/orders/by-number/${parsedArgs.order_number}`);
+});
+
+// ==================================
+// MANUFACTURING OPERATIONS
+// ==================================
+toolHandlers.set('stateset_create_robot_serial', async (client, args) => {
+  const parsedArgs = schemas.CreateRobotSerialArgsSchema.parse(args);
+  return await client.request('POST', '/manufacturing/robot-serials', parsedArgs);
+});
+
+toolHandlers.set('stateset_get_robot_serial', async (client, args) => {
+  const parsedArgs = schemas.GetRobotSerialArgsSchema.parse(args);
+  return await client.request('GET', `/manufacturing/robot-serials/${parsedArgs.robot_serial_id}`);
+});
+
+toolHandlers.set('stateset_list_robot_serials', async (client, args) => {
+  return await client.request('GET', '/manufacturing/robot-serials', schemas.ListArgsSchema.parse(args));
+});
+
+toolHandlers.set('stateset_update_robot_serial', async (client, args) => {
+  const parsedArgs = schemas.UpdateRobotSerialArgsSchema.parse(args);
+  const { robot_serial_id, ...data } = parsedArgs;
+  return await client.request('PUT', `/manufacturing/robot-serials/${robot_serial_id}`, data);
+});
+
+toolHandlers.set('stateset_delete_robot_serial', async (client, args) => {
+  const parsedArgs = schemas.DeleteRobotSerialArgsSchema.parse(args);
+  return await client.request('DELETE', `/manufacturing/robot-serials/${parsedArgs.robot_serial_id}`);
+});
+
+toolHandlers.set('stateset_create_component_serial', async (client, args) => {
+  const parsedArgs = schemas.CreateComponentSerialArgsSchema.parse(args);
+  return await client.request('POST', '/manufacturing/components', parsedArgs);
+});
+
+toolHandlers.set('stateset_get_component_serial', async (client, args) => {
+  const parsedArgs = schemas.GetComponentSerialArgsSchema.parse(args);
+  return await client.request('GET', `/manufacturing/components/${parsedArgs.component_id}`);
+});
+
+toolHandlers.set('stateset_update_component_serial', async (client, args) => {
+  const parsedArgs = schemas.UpdateComponentSerialArgsSchema.parse(args);
+  const { component_id, ...data } = parsedArgs;
+  return await client.request('PUT', `/manufacturing/components/${component_id}`, data);
+});
+
+toolHandlers.set('stateset_install_component', async (client, args) => {
+  const parsedArgs = schemas.InstallComponentArgsSchema.parse(args);
+  const { component_id, ...data } = parsedArgs;
+  return await client.request('POST', `/manufacturing/components/${component_id}/install`, data);
+});
+
+toolHandlers.set('stateset_remove_component', async (client, args) => {
+  const parsedArgs = schemas.RemoveComponentArgsSchema.parse(args);
+  const { component_id, ...data } = parsedArgs;
+  return await client.request('POST', `/manufacturing/components/${component_id}/remove`, data);
+});
+
+toolHandlers.set('stateset_create_test_protocol', async (client, args) => {
+  const parsedArgs = schemas.CreateTestProtocolArgsSchema.parse(args);
+  return await client.request('POST', '/manufacturing/test-protocols', parsedArgs);
+});
+
+toolHandlers.set('stateset_get_test_protocol', async (client, args) => {
+  const parsedArgs = schemas.GetTestProtocolArgsSchema.parse(args);
+  return await client.request('GET', `/manufacturing/test-protocols/${parsedArgs.protocol_id}`);
+});
+
+toolHandlers.set('stateset_create_test_result', async (client, args) => {
+  const parsedArgs = schemas.CreateTestResultArgsSchema.parse(args);
+  return await client.request('POST', '/manufacturing/test-results', parsedArgs);
+});
+
+toolHandlers.set('stateset_get_test_result', async (client, args) => {
+  const parsedArgs = schemas.GetTestResultArgsSchema.parse(args);
+  return await client.request('GET', `/manufacturing/test-results/${parsedArgs.result_id}`);
+});
+
+toolHandlers.set('stateset_create_ncr', async (client, args) => {
+  const parsedArgs = schemas.CreateNCRArgsSchema.parse(args);
+  return await client.request('POST', '/manufacturing/ncrs', parsedArgs);
+});
+
+toolHandlers.set('stateset_get_ncr', async (client, args) => {
+  const parsedArgs = schemas.GetNCRArgsSchema.parse(args);
+  return await client.request('GET', `/manufacturing/ncrs/${parsedArgs.ncr_id}`);
+});
+
+toolHandlers.set('stateset_close_ncr', async (client, args) => {
+  const parsedArgs = schemas.CloseNCRArgsSchema.parse(args);
+  const { ncr_id, ...data } = parsedArgs;
+  return await client.request('POST', `/manufacturing/ncrs/${ncr_id}/close`, data);
+});
+
+toolHandlers.set('stateset_create_certification', async (client, args) => {
+  const parsedArgs = schemas.CreateCertificationArgsSchema.parse(args);
+  return await client.request('POST', '/manufacturing/certifications', parsedArgs);
+});
+
+toolHandlers.set('stateset_get_certification', async (client, args) => {
+  const parsedArgs = schemas.GetCertificationArgsSchema.parse(args);
+  return await client.request('GET', `/manufacturing/certifications/${parsedArgs.certification_id}`);
+});
+
+toolHandlers.set('stateset_create_service_record', async (client, args) => {
+  const parsedArgs = schemas.CreateServiceRecordArgsSchema.parse(args);
+  return await client.request('POST', '/manufacturing/service-records', parsedArgs);
+});
+
+toolHandlers.set('stateset_get_service_record', async (client, args) => {
+  const parsedArgs = schemas.GetServiceRecordArgsSchema.parse(args);
+  return await client.request('GET', `/manufacturing/service-records/${parsedArgs.service_record_id}`);
+});
+
+toolHandlers.set('stateset_complete_service_record', async (client, args) => {
+  const parsedArgs = schemas.CompleteServiceRecordArgsSchema.parse(args);
+  const { service_record_id, ...data } = parsedArgs;
+  return await client.request('POST', `/manufacturing/service-records/${service_record_id}/complete`, data);
+});
+
+toolHandlers.set('stateset_record_production_metrics', async (client, args) => {
+  const parsedArgs = schemas.RecordProductionMetricsArgsSchema.parse(args);
+  return await client.request('POST', '/manufacturing/production-metrics', parsedArgs);
+});
+
+toolHandlers.set('stateset_get_production_metrics', async (client, args) => {
+  const parsedArgs = schemas.GetProductionMetricsArgsSchema.parse(args);
+  return await client.request('GET', '/manufacturing/production-metrics', parsedArgs);
+});
+
+// ==================================
+// WORK ORDER EXTENDED OPERATIONS
+// ==================================
+toolHandlers.set('stateset_update_work_order_status', async (client, args) => {
+  const parsedArgs = schemas.UpdateWorkOrderStatusArgsSchema.parse(args);
+  const { work_order_id, ...data } = parsedArgs;
+  return await client.request('PUT', `/work-orders/${work_order_id}/status`, data);
+});
+
+toolHandlers.set('stateset_schedule_work_order', async (client, args) => {
+  const parsedArgs = schemas.ScheduleWorkOrderArgsSchema.parse(args);
+  const { work_order_id, ...data } = parsedArgs;
+  return await client.request('POST', `/work-orders/${work_order_id}/schedule`, data);
+});
+
+toolHandlers.set('stateset_update_work_order_task', async (client, args) => {
+  const parsedArgs = schemas.UpdateWorkOrderTaskArgsSchema.parse(args);
+  const { work_order_id, task_id, ...data } = parsedArgs;
+  return await client.request('PUT', `/work-orders/${work_order_id}/tasks/${task_id}`, data);
+});
+
+toolHandlers.set('stateset_get_work_center_capacity', async (client, args) => {
+  const parsedArgs = schemas.GetWorkCenterCapacityArgsSchema.parse(args);
+  const { work_center_id, ...params } = parsedArgs;
+  return await client.request('GET', `/work-orders/capacity/${work_center_id}`, params);
+});
+
+// ==================================
+// CUSTOMER AUTH OPERATIONS
+// ==================================
+toolHandlers.set('stateset_customer_login', async (client, args) => {
+  const parsedArgs = schemas.CustomerLoginArgsSchema.parse(args);
+  return await client.request('POST', '/customers/login', parsedArgs);
+});
+
+toolHandlers.set('stateset_customer_register', async (client, args) => {
+  const parsedArgs = schemas.CustomerRegisterArgsSchema.parse(args);
+  return await client.request('POST', '/customers/register', parsedArgs);
+});

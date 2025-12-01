@@ -999,3 +999,367 @@ export const GetSupplierArgsSchema = z.object({
 export const DeleteSupplierArgsSchema = z.object({
   supplier_id: z.string().min(1, 'Supplier ID is required'),
 });
+
+// ================================
+// USER SCHEMAS
+// ================================
+export const CreateUserArgsSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  name: z.string().min(1, 'Name is required'),
+  role: z.enum(['admin', 'manager', 'operator', 'viewer']).default('viewer'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+export const UpdateUserArgsSchema = z.object({
+  user_id: z.string().min(1, 'User ID is required'),
+  email: z.string().email('Invalid email format').optional(),
+  name: z.string().min(1).optional(),
+  role: z.enum(['admin', 'manager', 'operator', 'viewer']).optional(),
+});
+
+export const GetUserArgsSchema = z.object({
+  user_id: z.string().min(1, 'User ID is required'),
+});
+
+export const DeleteUserArgsSchema = z.object({
+  user_id: z.string().min(1, 'User ID is required'),
+});
+
+export const ChangePasswordArgsSchema = z.object({
+  user_id: z.string().min(1, 'User ID is required'),
+  current_password: z.string().min(1, 'Current password is required'),
+  new_password: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
+// ================================
+// NOTIFICATION SCHEMAS
+// ================================
+export const ListNotificationsArgsSchema = z.object({
+  page: z.number().positive().optional(),
+  per_page: z.number().positive().optional(),
+  unread_only: z.boolean().optional(),
+});
+
+export const GetNotificationArgsSchema = z.object({
+  notification_id: z.string().min(1, 'Notification ID is required'),
+});
+
+export const MarkNotificationReadArgsSchema = z.object({
+  notification_id: z.string().min(1, 'Notification ID is required'),
+});
+
+export const MarkNotificationUnreadArgsSchema = z.object({
+  notification_id: z.string().min(1, 'Notification ID is required'),
+});
+
+export const DeleteNotificationArgsSchema = z.object({
+  notification_id: z.string().min(1, 'Notification ID is required'),
+});
+
+// ================================
+// REPORT SCHEMAS
+// ================================
+export const GetOrderReportArgsSchema = z.object({
+  from_date: z.string().datetime().optional(),
+  to_date: z.string().datetime().optional(),
+  status: z.array(z.string()).optional(),
+  group_by: z.enum(['day', 'week', 'month', 'status', 'customer']).optional(),
+});
+
+export const GetInventoryReportArgsSchema = z.object({
+  location_id: z.number().int().positive().optional(),
+  low_stock_threshold: z.number().int().nonnegative().optional(),
+  include_zero_stock: z.boolean().optional(),
+});
+
+export const GetReturnsReportArgsSchema = z.object({
+  from_date: z.string().datetime().optional(),
+  to_date: z.string().datetime().optional(),
+  status: z.array(z.string()).optional(),
+  group_by: z.enum(['day', 'week', 'month', 'reason', 'status']).optional(),
+});
+
+// ================================
+// CHECKOUT EXTENDED SCHEMAS
+// ================================
+export const UpdateCheckoutCustomerArgsSchema = z.object({
+  checkout_id: z.string().min(1, 'Checkout ID is required'),
+  customer_id: z.string().min(1, 'Customer ID is required').optional(),
+  email: z.string().email('Invalid email format').optional(),
+  name: z.string().min(1).optional(),
+  phone: z.string().optional(),
+});
+
+export const UpdateCheckoutShippingArgsSchema = z.object({
+  checkout_id: z.string().min(1, 'Checkout ID is required'),
+  shipping_address: z.object({
+    street: z.string().min(1, 'Street is required'),
+    city: z.string().min(1, 'City is required'),
+    state: z.string().min(2, 'State is required'),
+    postal_code: z.string().min(3, 'Postal code is required'),
+    country: z.string().min(2, 'Country is required'),
+  }),
+  shipping_method: z.string().min(1, 'Shipping method is required').optional(),
+});
+
+export const UpdateCheckoutPaymentArgsSchema = z.object({
+  checkout_id: z.string().min(1, 'Checkout ID is required'),
+  payment_method: z.string().min(1, 'Payment method is required'),
+  billing_address: z
+    .object({
+      street: z.string().min(1),
+      city: z.string().min(1),
+      state: z.string().min(2),
+      postal_code: z.string().min(3),
+      country: z.string().min(2),
+    })
+    .optional(),
+});
+
+export const ApplyCheckoutCouponArgsSchema = z.object({
+  checkout_id: z.string().min(1, 'Checkout ID is required'),
+  coupon_code: z.string().min(1, 'Coupon code is required'),
+});
+
+// ================================
+// AGENTIC CHECKOUT SCHEMAS
+// ================================
+export const CreateAgenticCheckoutArgsSchema = z.object({
+  customer_id: z.string().min(1, 'Customer ID is required').optional(),
+  session_context: z.record(z.any()).optional(),
+});
+
+export const GetAgenticCheckoutArgsSchema = z.object({
+  session_id: z.string().min(1, 'Session ID is required'),
+});
+
+export const ProcessNaturalLanguageArgsSchema = z.object({
+  session_id: z.string().min(1, 'Session ID is required'),
+  input: z.string().min(1, 'Input text is required'),
+  context: z.record(z.any()).optional(),
+});
+
+export const GetAgenticRecommendationsArgsSchema = z.object({
+  session_id: z.string().min(1, 'Session ID is required'),
+  recommendation_type: z
+    .enum(['products', 'shipping', 'payment', 'upsell', 'cross_sell'])
+    .optional(),
+});
+
+// ================================
+// ORDER EXTENDED SCHEMAS
+// ================================
+export const GetOrderByNumberArgsSchema = z.object({
+  order_number: z.string().min(1, 'Order number is required'),
+});
+
+// ================================
+// MANUFACTURING SCHEMAS
+// ================================
+export const CreateRobotSerialArgsSchema = z.object({
+  serial_number: z.string().min(1, 'Serial number is required'),
+  model: z.string().min(1, 'Model is required'),
+  manufactured_date: z.string().datetime().optional(),
+  status: z.enum(['production', 'testing', 'certified', 'shipped', 'deployed']).optional(),
+  notes: z.string().optional(),
+});
+
+export const GetRobotSerialArgsSchema = z.object({
+  robot_serial_id: z.string().min(1, 'Robot serial ID is required'),
+});
+
+export const UpdateRobotSerialArgsSchema = z.object({
+  robot_serial_id: z.string().min(1, 'Robot serial ID is required'),
+  status: z.enum(['production', 'testing', 'certified', 'shipped', 'deployed']).optional(),
+  notes: z.string().optional(),
+});
+
+export const DeleteRobotSerialArgsSchema = z.object({
+  robot_serial_id: z.string().min(1, 'Robot serial ID is required'),
+});
+
+export const CreateComponentSerialArgsSchema = z.object({
+  serial_number: z.string().min(1, 'Serial number is required'),
+  component_type: z.string().min(1, 'Component type is required'),
+  robot_serial_id: z.string().optional(),
+  status: z.enum(['available', 'installed', 'failed', 'retired']).optional(),
+});
+
+export const GetComponentSerialArgsSchema = z.object({
+  component_id: z.string().min(1, 'Component ID is required'),
+});
+
+export const UpdateComponentSerialArgsSchema = z.object({
+  component_id: z.string().min(1, 'Component ID is required'),
+  status: z.enum(['available', 'installed', 'failed', 'retired']).optional(),
+  notes: z.string().optional(),
+});
+
+export const InstallComponentArgsSchema = z.object({
+  component_id: z.string().min(1, 'Component ID is required'),
+  robot_serial_id: z.string().min(1, 'Robot serial ID is required'),
+  installation_date: z.string().datetime().optional(),
+});
+
+export const RemoveComponentArgsSchema = z.object({
+  component_id: z.string().min(1, 'Component ID is required'),
+  removal_reason: z.string().optional(),
+});
+
+export const CreateTestProtocolArgsSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  description: z.string().optional(),
+  steps: z
+    .array(
+      z.object({
+        step_number: z.number().int().positive(),
+        description: z.string().min(1),
+        expected_result: z.string().optional(),
+        pass_criteria: z.string().optional(),
+      }),
+    )
+    .min(1, 'At least one step is required'),
+  applicable_models: z.array(z.string()).optional(),
+});
+
+export const GetTestProtocolArgsSchema = z.object({
+  protocol_id: z.string().min(1, 'Protocol ID is required'),
+});
+
+export const CreateTestResultArgsSchema = z.object({
+  robot_serial_id: z.string().min(1, 'Robot serial ID is required'),
+  protocol_id: z.string().min(1, 'Protocol ID is required'),
+  tester_id: z.string().min(1, 'Tester ID is required'),
+  results: z
+    .array(
+      z.object({
+        step_number: z.number().int().positive(),
+        passed: z.boolean(),
+        actual_result: z.string().optional(),
+        notes: z.string().optional(),
+      }),
+    )
+    .min(1, 'At least one result is required'),
+  overall_status: z.enum(['pass', 'fail', 'conditional']),
+});
+
+export const GetTestResultArgsSchema = z.object({
+  result_id: z.string().min(1, 'Result ID is required'),
+});
+
+export const CreateNCRArgsSchema = z.object({
+  robot_serial_id: z.string().min(1, 'Robot serial ID is required').optional(),
+  component_id: z.string().optional(),
+  description: z.string().min(1, 'Description is required'),
+  severity: z.enum(['minor', 'major', 'critical']),
+  reported_by: z.string().min(1, 'Reporter is required'),
+  corrective_action: z.string().optional(),
+});
+
+export const GetNCRArgsSchema = z.object({
+  ncr_id: z.string().min(1, 'NCR ID is required'),
+});
+
+export const CloseNCRArgsSchema = z.object({
+  ncr_id: z.string().min(1, 'NCR ID is required'),
+  resolution: z.string().min(1, 'Resolution is required'),
+  closed_by: z.string().min(1, 'Closer is required'),
+});
+
+export const CreateCertificationArgsSchema = z.object({
+  robot_serial_id: z.string().min(1, 'Robot serial ID is required'),
+  certification_type: z.string().min(1, 'Certification type is required'),
+  certified_by: z.string().min(1, 'Certifier is required'),
+  valid_until: z.string().datetime().optional(),
+  notes: z.string().optional(),
+});
+
+export const GetCertificationArgsSchema = z.object({
+  certification_id: z.string().min(1, 'Certification ID is required'),
+});
+
+export const CreateServiceRecordArgsSchema = z.object({
+  robot_serial_id: z.string().min(1, 'Robot serial ID is required'),
+  service_type: z.enum(['maintenance', 'repair', 'upgrade', 'inspection']),
+  description: z.string().min(1, 'Description is required'),
+  technician_id: z.string().min(1, 'Technician ID is required'),
+  parts_used: z
+    .array(
+      z.object({
+        component_id: z.string(),
+        quantity: z.number().int().positive(),
+      }),
+    )
+    .optional(),
+});
+
+export const GetServiceRecordArgsSchema = z.object({
+  service_record_id: z.string().min(1, 'Service record ID is required'),
+});
+
+export const CompleteServiceRecordArgsSchema = z.object({
+  service_record_id: z.string().min(1, 'Service record ID is required'),
+  completion_notes: z.string().optional(),
+});
+
+export const RecordProductionMetricsArgsSchema = z.object({
+  production_line_id: z.string().min(1, 'Production line ID is required'),
+  shift_date: z.string().datetime(),
+  metrics: z.object({
+    units_produced: z.number().int().nonnegative(),
+    units_passed: z.number().int().nonnegative(),
+    units_failed: z.number().int().nonnegative(),
+    downtime_minutes: z.number().nonnegative().optional(),
+    efficiency_rate: z.number().min(0).max(100).optional(),
+  }),
+});
+
+export const GetProductionMetricsArgsSchema = z.object({
+  production_line_id: z.string().optional(),
+  from_date: z.string().datetime().optional(),
+  to_date: z.string().datetime().optional(),
+});
+
+// ================================
+// WORK ORDER EXTENDED SCHEMAS
+// ================================
+export const UpdateWorkOrderStatusArgsSchema = z.object({
+  work_order_id: z.string().min(1, 'Work Order ID is required'),
+  status: z.enum(['pending', 'scheduled', 'in_progress', 'on_hold', 'completed', 'cancelled']),
+});
+
+export const ScheduleWorkOrderArgsSchema = z.object({
+  work_order_id: z.string().min(1, 'Work Order ID is required'),
+  scheduled_start: z.string().datetime(),
+  scheduled_end: z.string().datetime().optional(),
+  work_center_id: z.string().optional(),
+});
+
+export const UpdateWorkOrderTaskArgsSchema = z.object({
+  work_order_id: z.string().min(1, 'Work Order ID is required'),
+  task_id: z.string().min(1, 'Task ID is required'),
+  status: z.enum(['pending', 'in_progress', 'completed', 'skipped']).optional(),
+  notes: z.string().optional(),
+  completed_by: z.string().optional(),
+});
+
+export const GetWorkCenterCapacityArgsSchema = z.object({
+  work_center_id: z.string().min(1, 'Work center ID is required'),
+  from_date: z.string().datetime().optional(),
+  to_date: z.string().datetime().optional(),
+});
+
+// ================================
+// CUSTOMER AUTH SCHEMAS
+// ================================
+export const CustomerLoginArgsSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+export const CustomerRegisterArgsSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  name: z.string().min(1, 'Name is required'),
+  phone: z.string().optional(),
+});
