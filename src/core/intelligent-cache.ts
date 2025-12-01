@@ -376,7 +376,11 @@ export class IntelligentCache<T> extends EventEmitter {
     // Simple prediction based on access frequency
     const intervals: number[] = [];
     for (let i = 1; i < history.length; i++) {
-      intervals.push(history[i] - history[i - 1]);
+      const current = history[i];
+      const previous = history[i - 1];
+      if (current !== undefined && previous !== undefined) {
+        intervals.push(current - previous);
+      }
     }
 
     const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;

@@ -153,7 +153,12 @@ export class HybridCache {
 
       case 'hybrid':
         // Set in both levels
-        this.memoryCache.set(namespace, key, value, ttl ? Math.min(ttl, this.hybridL1TTL) * 1000 : this.hybridL1TTL * 1000);
+        this.memoryCache.set(
+          namespace,
+          key,
+          value,
+          ttl ? Math.min(ttl, this.hybridL1TTL) * 1000 : this.hybridL1TTL * 1000,
+        );
         if (this.redisCache) {
           await this.redisCache.set(namespace, key, value, ttl);
         }
@@ -234,14 +239,16 @@ export class HybridCache {
 
         return {
           l1: memStats,
-          l2: redisStats ? {
-            hits: 0,
-            misses: 0,
-            evictions: 0,
-            size: redisStats.memoryUsage,
-            itemCount: redisStats.totalKeys,
-            hitRate: redisStats.hitRate || 0,
-          } : this.getEmptyStats(),
+          l2: redisStats
+            ? {
+                hits: 0,
+                misses: 0,
+                evictions: 0,
+                size: redisStats.memoryUsage,
+                itemCount: redisStats.totalKeys,
+                hitRate: redisStats.hitRate || 0,
+              }
+            : this.getEmptyStats(),
         } as any;
 
       default:
@@ -318,7 +325,9 @@ export function getHybridCache(options?: Partial<HybridCacheOptions>): HybridCac
   return hybridCacheInstance;
 }
 
-export async function initializeHybridCache(options?: Partial<HybridCacheOptions>): Promise<HybridCache> {
+export async function initializeHybridCache(
+  options?: Partial<HybridCacheOptions>,
+): Promise<HybridCache> {
   const cache = getHybridCache(options);
   await cache.connect();
   logger.info('Hybrid cache initialized and connected');

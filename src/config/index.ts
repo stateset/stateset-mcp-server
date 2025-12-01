@@ -53,16 +53,18 @@ const ConfigSchema = z.object({
     maxSize: z.number().positive().default(1000),
     strategy: z.enum(['lru', 'lfu', 'fifo']).default('lru'),
     backend: z.enum(['memory', 'redis', 'hybrid']).default('memory'),
-    redis: z.object({
-      enabled: z.boolean().default(false),
-      host: z.string().default('localhost'),
-      port: z.number().positive().default(6379),
-      password: z.string().optional(),
-      db: z.number().min(0).default(0),
-      keyPrefix: z.string().default('stateset:mcp:'),
-      hybridL1Size: z.number().positive().default(1000),
-      hybridL1TTL: z.number().positive().default(60),
-    }).optional(),
+    redis: z
+      .object({
+        enabled: z.boolean().default(false),
+        host: z.string().default('localhost'),
+        port: z.number().positive().default(6379),
+        password: z.string().optional(),
+        db: z.number().min(0).default(0),
+        keyPrefix: z.string().default('stateset:mcp:'),
+        hybridL1Size: z.number().positive().default(1000),
+        hybridL1TTL: z.number().positive().default(60),
+      })
+      .optional(),
   }),
 
   // Circuit Breaker Configuration
@@ -136,8 +138,12 @@ function loadConfig(): Config {
         password: process.env.REDIS_PASSWORD,
         db: process.env.REDIS_DB ? parseInt(process.env.REDIS_DB, 10) : undefined,
         keyPrefix: process.env.REDIS_KEY_PREFIX,
-        hybridL1Size: process.env.REDIS_HYBRID_L1_SIZE ? parseInt(process.env.REDIS_HYBRID_L1_SIZE, 10) : undefined,
-        hybridL1TTL: process.env.REDIS_HYBRID_L1_TTL ? parseInt(process.env.REDIS_HYBRID_L1_TTL, 10) : undefined,
+        hybridL1Size: process.env.REDIS_HYBRID_L1_SIZE
+          ? parseInt(process.env.REDIS_HYBRID_L1_SIZE, 10)
+          : undefined,
+        hybridL1TTL: process.env.REDIS_HYBRID_L1_TTL
+          ? parseInt(process.env.REDIS_HYBRID_L1_TTL, 10)
+          : undefined,
       },
     },
     circuitBreaker: {

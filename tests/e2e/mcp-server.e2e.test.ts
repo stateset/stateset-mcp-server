@@ -137,10 +137,11 @@ describe('MCP Server E2E Tests', () => {
       expect(response.content).toBeDefined();
       expect(Array.isArray(response.content)).toBe(true);
 
-      const content = response.content[0];
+      const contentArray = response.content as Array<{ type: string; text?: string }>;
+      const content = contentArray[0];
       expect(content.type).toBe('text');
 
-      if (content.type === 'text') {
+      if (content.type === 'text' && content.text) {
         const healthData = JSON.parse(content.text);
         expect(healthData.status).toBeDefined();
         expect(['healthy', 'degraded', 'unhealthy']).toContain(healthData.status);
@@ -156,10 +157,11 @@ describe('MCP Server E2E Tests', () => {
       expect(response).toBeDefined();
       expect(response.content).toBeDefined();
 
-      const content = response.content[0];
+      const contentArray = response.content as Array<{ type: string; text?: string }>;
+      const content = contentArray[0];
       expect(content.type).toBe('text');
 
-      if (content.type === 'text') {
+      if (content.type === 'text' && content.text) {
         const cacheData = JSON.parse(content.text);
         expect(cacheData).toBeDefined();
         expect(typeof cacheData).toBe('object');
@@ -175,10 +177,11 @@ describe('MCP Server E2E Tests', () => {
       expect(response).toBeDefined();
       expect(response.content).toBeDefined();
 
-      const content = response.content[0];
+      const contentArray = response.content as Array<{ type: string; text?: string }>;
+      const content = contentArray[0];
       expect(content.type).toBe('text');
 
-      if (content.type === 'text') {
+      if (content.type === 'text' && content.text) {
         const metricsData = JSON.parse(content.text);
         expect(metricsData.totalRequests).toBeDefined();
         expect(typeof metricsData.totalRequests).toBe('number');

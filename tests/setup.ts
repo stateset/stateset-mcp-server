@@ -15,11 +15,17 @@ export const delay = (ms: number): Promise<void> =>
 
 // Setup global afterEach to clean up resources
 afterEach(async () => {
-  // Clear all timers
+  // Clear all Jest timers
   jest.clearAllTimers();
 
   // Give pending async operations a chance to complete
   await new Promise(resolve => setImmediate(resolve));
+});
+
+// Setup global afterAll for final cleanup
+afterAll(async () => {
+  // Allow final async operations to complete
+  await new Promise(resolve => setTimeout(resolve, 50));
 });
 
 // Setup global beforeAll

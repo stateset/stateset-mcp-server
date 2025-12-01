@@ -363,10 +363,12 @@ describe('HybridCache', () => {
   describe('Fetcher Function', () => {
     let cache: HybridCache;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       cache = new HybridCache({
         backend: 'memory',
       });
+      // Clear test namespace to ensure clean state for fetcher tests
+      await cache.clear('fetcher-test');
     });
 
     afterEach(async () => {
@@ -374,8 +376,9 @@ describe('HybridCache', () => {
     });
 
     it('should use fetcher on cache miss', async () => {
-      const namespace = 'test';
-      const key = 'key1';
+      // Use unique namespace to avoid conflicts with other tests
+      const namespace = 'fetcher-test';
+      const key = `fetcher-key-${Date.now()}`;
       const fetchedValue = { data: 'fetched' };
 
       const fetcher = jest.fn().mockResolvedValue(fetchedValue);
@@ -392,8 +395,9 @@ describe('HybridCache', () => {
     });
 
     it('should handle fetcher errors', async () => {
-      const namespace = 'test';
-      const key = 'key1';
+      // Use unique namespace to avoid conflicts with other tests
+      const namespace = 'fetcher-test';
+      const key = `error-key-${Date.now()}`;
 
       const fetcher = jest.fn().mockRejectedValue(new Error('Fetch failed'));
 

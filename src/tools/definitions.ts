@@ -759,4 +759,3 @@ export const resourceTemplates: ResourceTemplate[] = [
     description: 'Payment record',
   },
 ];
-
