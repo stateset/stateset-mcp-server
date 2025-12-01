@@ -276,6 +276,414 @@ const toolDefinitions: (ToolDefinition | Tool)[] = [
     inputSchema: schemas.GetShipmentArgsSchema.shape as any,
   },
 
+  // =======================
+  // ORDER WORKFLOW OPERATIONS
+  // =======================
+  {
+    name: 'stateset_cancel_order',
+    description:
+      'Cancels an order. Use when a customer requests cancellation or order cannot be fulfilled. The order must not already be shipped. Optionally provide a reason for the cancellation.',
+    inputSchema: schemas.CancelOrderArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_archive_order',
+    description:
+      'Archives a completed or cancelled order. Use to move old orders out of active view while retaining them for historical reference. Archived orders can still be retrieved but won\'t appear in default listings.',
+    inputSchema: schemas.ArchiveOrderArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_update_order_status',
+    description:
+      'Updates the status of an order. Valid statuses: pending, processing, shipped, delivered, cancelled, returned. Use this for manual status transitions in the order lifecycle.',
+    inputSchema: schemas.UpdateOrderStatusArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_order_items',
+    description:
+      'Retrieves all line items for a specific order. Returns product details, quantities, prices, and item-level status. Use to review order contents or for fulfillment preparation.',
+    inputSchema: schemas.GetOrderItemsArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_add_order_item',
+    description:
+      'Adds a new item to an existing order. Only works for orders in pending or processing status. Specify the product, quantity, and optionally the unit price.',
+    inputSchema: schemas.AddOrderItemArgsSchema.shape as any,
+  },
+
+  // =======================
+  // INVENTORY WORKFLOW OPERATIONS
+  // =======================
+  {
+    name: 'stateset_reserve_inventory',
+    description:
+      'Reserves inventory for a specific purpose (order, transfer, or work order). Reserved inventory is not available for other allocations. Use before committing to fulfillment.',
+    inputSchema: schemas.ReserveInventoryArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_release_inventory',
+    description:
+      'Releases previously reserved inventory back to available stock. Use when an order is cancelled or reservation is no longer needed.',
+    inputSchema: schemas.ReleaseInventoryArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_low_stock',
+    description:
+      'Retrieves inventory items below a specified threshold. Use for reorder point monitoring and stock alerts. Can filter by location.',
+    inputSchema: schemas.GetLowStockArgsSchema.shape as any,
+  },
+
+  // =======================
+  // SHIPMENT WORKFLOW OPERATIONS
+  // =======================
+  {
+    name: 'stateset_track_shipment',
+    description:
+      'Tracks a shipment by ID or tracking number. Returns current location, status, and delivery estimates. Use for customer inquiries and delivery monitoring.',
+    inputSchema: schemas.TrackShipmentArgsSchema.shape as any,
+  },
+
+  // =======================
+  // WARRANTY WORKFLOW OPERATIONS
+  // =======================
+  {
+    name: 'stateset_extend_warranty',
+    description:
+      'Extends an existing warranty by a specified number of months. Use for warranty upgrades, promotions, or goodwill extensions.',
+    inputSchema: schemas.ExtendWarrantyArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_create_warranty_claim',
+    description:
+      'Creates a warranty claim against an active warranty. Specify the claim reason and optionally an estimated claim amount. Returns a claim ID for tracking.',
+    inputSchema: schemas.CreateWarrantyClaimArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_approve_warranty_claim',
+    description:
+      'Approves a warranty claim. Optionally specify the approved amount if different from the claimed amount. Use after reviewing the claim validity.',
+    inputSchema: schemas.ApproveWarrantyClaimArgsSchema.shape as any,
+  },
+
+  // =======================
+  // WORK ORDER WORKFLOW OPERATIONS
+  // =======================
+  {
+    name: 'stateset_assign_work_order',
+    description:
+      'Assigns a work order to a specific user or team. The assignee will be responsible for completing the work order tasks.',
+    inputSchema: schemas.AssignWorkOrderArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_complete_work_order',
+    description:
+      'Marks a work order as complete. Use when all tasks have been finished and the work order is ready for closure.',
+    inputSchema: schemas.CompleteWorkOrderArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_start_work_order',
+    description:
+      'Starts work on a work order. Changes status from assigned to in-progress. Use when beginning actual production or service work.',
+    inputSchema: schemas.StartWorkOrderArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_hold_work_order',
+    description:
+      'Places a work order on hold. Use when work cannot continue due to missing materials, pending decisions, or other blockers. Requires a reason.',
+    inputSchema: schemas.HoldWorkOrderArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_cancel_work_order',
+    description:
+      'Cancels a work order. Use when the work is no longer needed or the associated order has been cancelled.',
+    inputSchema: schemas.CancelWorkOrderArgsSchema.shape as any,
+  },
+
+  // =======================
+  // PRODUCT VARIANT OPERATIONS
+  // =======================
+  {
+    name: 'stateset_get_product_variants',
+    description:
+      'Retrieves all variants for a product. Variants represent different options like size, color, or configuration. Returns SKUs, prices, and availability.',
+    inputSchema: schemas.GetProductVariantsArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_create_product_variant',
+    description:
+      'Creates a new variant for a product. Specify SKU, name, price, and optional attributes like size or color.',
+    inputSchema: schemas.CreateProductVariantArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_update_product_variant_price',
+    description:
+      'Updates the price of a product variant. Use for price adjustments, promotions, or currency updates.',
+    inputSchema: schemas.UpdateProductVariantPriceArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_delete_product_variant',
+    description:
+      'Deletes a product variant. WARNING: This may affect existing orders referencing this variant. Consider deactivating instead.',
+    inputSchema: schemas.DeleteProductVariantArgsSchema.shape as any,
+  },
+
+  // =======================
+  // CART OPERATIONS
+  // =======================
+  {
+    name: 'stateset_create_cart',
+    description:
+      'Creates a new shopping cart for a customer. Returns a cart ID that can be used to add items and proceed to checkout.',
+    inputSchema: schemas.CreateCartArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_cart',
+    description:
+      'Retrieves a cart by ID. Returns all items in the cart with their quantities, prices, and subtotals.',
+    inputSchema: schemas.GetCartArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_delete_cart',
+    description:
+      'Deletes a cart. Use when a cart is abandoned or customer starts over. This action is permanent.',
+    inputSchema: schemas.DeleteCartArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_add_cart_item',
+    description:
+      'Adds an item to a shopping cart. Specify the product variant and quantity. If the item already exists, quantity is added.',
+    inputSchema: schemas.AddCartItemArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_update_cart_item',
+    description:
+      'Updates the quantity of an item in the cart. Use to increase or decrease quantities before checkout.',
+    inputSchema: schemas.UpdateCartItemArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_remove_cart_item',
+    description:
+      'Removes an item from the cart entirely. Use when customer decides not to purchase a specific item.',
+    inputSchema: schemas.RemoveCartItemArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_clear_cart',
+    description:
+      'Removes all items from a cart. Use when customer wants to start over with an empty cart.',
+    inputSchema: schemas.ClearCartArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_list_carts',
+    description:
+      'Lists shopping carts. Can filter by customer ID to see a specific customer\'s carts. Returns cart summaries with item counts and totals.',
+    inputSchema: schemas.ListCartsArgsSchema.shape as any,
+  },
+
+  // =======================
+  // CHECKOUT OPERATIONS
+  // =======================
+  {
+    name: 'stateset_create_checkout',
+    description:
+      'Initializes a checkout session from a cart. Specify shipping and payment methods. Returns a checkout ID for further processing.',
+    inputSchema: schemas.CreateCheckoutArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_checkout',
+    description:
+      'Retrieves a checkout session. Returns cart contents, shipping info, payment details, and order totals including tax and shipping costs.',
+    inputSchema: schemas.GetCheckoutArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_update_checkout',
+    description:
+      'Updates checkout session details. Can modify shipping/billing addresses, shipping method, or payment method before completing.',
+    inputSchema: schemas.UpdateCheckoutArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_complete_checkout',
+    description:
+      'Completes the checkout and creates an order. Processes payment and initiates fulfillment. Returns the created order ID.',
+    inputSchema: schemas.CompleteCheckoutArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_cancel_checkout',
+    description:
+      'Cancels a checkout session. The cart remains intact and can be used for a new checkout attempt.',
+    inputSchema: schemas.CancelCheckoutArgsSchema.shape as any,
+  },
+
+  // =======================
+  // PAYMENT WORKFLOW OPERATIONS
+  // =======================
+  {
+    name: 'stateset_refund_payment',
+    description:
+      'Processes a refund for a payment. Specify the amount to refund and the reason. Partial refunds are supported.',
+    inputSchema: schemas.RefundPaymentArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_payments_by_order',
+    description:
+      'Retrieves all payments associated with an order. Use to review payment history, check payment status, or reconcile transactions.',
+    inputSchema: schemas.GetPaymentsByOrderArgsSchema.shape as any,
+  },
+
+  // =======================
+  // CUSTOMER WORKFLOW OPERATIONS
+  // =======================
+  {
+    name: 'stateset_get_customer_addresses',
+    description:
+      'Retrieves all addresses for a customer. Returns shipping and billing addresses with their types and default settings.',
+    inputSchema: schemas.GetCustomerAddressesArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_add_customer_address',
+    description:
+      'Adds a new address to a customer\'s address book. Can specify address type (shipping, billing, or both) and set as default.',
+    inputSchema: schemas.AddCustomerAddressArgsSchema.shape as any,
+  },
+
+  // =======================
+  // PURCHASE ORDER WORKFLOW OPERATIONS
+  // =======================
+  {
+    name: 'stateset_approve_purchase_order',
+    description:
+      'Approves a purchase order for submission to the vendor. Use after reviewing PO details and confirming budget approval.',
+    inputSchema: schemas.ApprovePurchaseOrderArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_cancel_purchase_order',
+    description:
+      'Cancels a purchase order. Only works for POs not yet received. Optionally provide a cancellation reason.',
+    inputSchema: schemas.CancelPurchaseOrderArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_receive_purchase_order',
+    description:
+      'Records receipt of items from a purchase order. Specify quantities received for each item. Updates inventory automatically.',
+    inputSchema: schemas.ReceivePurchaseOrderArgsSchema.shape as any,
+  },
+
+  // =======================
+  // ASN WORKFLOW OPERATIONS
+  // =======================
+  {
+    name: 'stateset_mark_asn_in_transit',
+    description:
+      'Marks an ASN as in transit. Use when goods have shipped from the supplier. Optionally add tracking number and estimated delivery.',
+    inputSchema: schemas.MarkASNInTransitArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_mark_asn_delivered',
+    description:
+      'Marks an ASN as delivered. Use when goods have arrived at the destination. Records the delivery date.',
+    inputSchema: schemas.MarkASNDeliveredArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_cancel_asn',
+    description:
+      'Cancels an ASN. Use when the shipment is cancelled or the ASN was created in error.',
+    inputSchema: schemas.CancelASNArgsSchema.shape as any,
+  },
+
+  // =======================
+  // BOM WORKFLOW OPERATIONS
+  // =======================
+  {
+    name: 'stateset_get_bom_components',
+    description:
+      'Retrieves all components for a Bill of Materials. Returns component IDs, quantities, units of measure, and sequence.',
+    inputSchema: schemas.GetBOMComponentsArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_add_bom_component',
+    description:
+      'Adds a component to a Bill of Materials. Specify component ID, quantity, and optionally unit of measure and sequence.',
+    inputSchema: schemas.AddBOMComponentArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_remove_bom_component',
+    description:
+      'Removes a component from a Bill of Materials. Use when a component is no longer needed in the product structure.',
+    inputSchema: schemas.RemoveBOMComponentArgsSchema.shape as any,
+  },
+
+  // =======================
+  // ANALYTICS OPERATIONS
+  // =======================
+  {
+    name: 'stateset_get_dashboard_metrics',
+    description:
+      'Retrieves key dashboard metrics: total orders, total revenue, inventory value, and shipments in transit. Use for executive dashboards.',
+    inputSchema: schemas.GetDashboardMetricsArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_sales_trends',
+    description:
+      'Retrieves sales trends over time. Specify date range and interval (daily, weekly, monthly). Returns time-series sales data.',
+    inputSchema: schemas.GetSalesTrendsArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_sales_metrics',
+    description:
+      'Retrieves sales metrics: total sales, average order value, and orders by status. Optionally filter by date range.',
+    inputSchema: schemas.GetSalesMetricsArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_inventory_metrics',
+    description:
+      'Retrieves inventory metrics: total value, stock levels, and turnover rates. Can filter by location.',
+    inputSchema: schemas.GetInventoryMetricsArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_shipment_metrics',
+    description:
+      'Retrieves shipment metrics: shipments by status and delivery performance. Use for logistics monitoring.',
+    inputSchema: schemas.GetShipmentMetricsArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_cart_metrics',
+    description:
+      'Retrieves cart metrics: cart abandonment rate and average cart value. Use for e-commerce optimization.',
+    inputSchema: schemas.GetCartMetricsArgsSchema.shape as any,
+  },
+
+  // =======================
+  // SUPPLIER OPERATIONS
+  // =======================
+  {
+    name: 'stateset_create_supplier',
+    description:
+      'Creates a new supplier record. Store contact information, address, and payment terms. Suppliers are used in purchase orders.',
+    inputSchema: schemas.CreateSupplierArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_update_supplier',
+    description:
+      'Updates supplier information. Can modify contact details, address, and payment terms.',
+    inputSchema: schemas.UpdateSupplierArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_get_supplier',
+    description:
+      'Retrieves a supplier by ID. Returns full supplier details including contact info and payment terms.',
+    inputSchema: schemas.GetSupplierArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_delete_supplier',
+    description:
+      'Deletes a supplier record. WARNING: May affect existing purchase orders. Consider deactivating instead.',
+    inputSchema: schemas.DeleteSupplierArgsSchema.shape as any,
+  },
+  {
+    name: 'stateset_list_suppliers',
+    description:
+      'Lists all suppliers with pagination. Use to browse the supplier base or find suppliers for new purchase orders.',
+    inputSchema: schemas.ListArgsSchema.shape as any,
+  },
+
   // ===================
   // DELETE OPERATIONS
   // ===================

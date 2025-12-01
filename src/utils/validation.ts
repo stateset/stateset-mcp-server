@@ -147,6 +147,163 @@ export function validateNoSqlInjection(input: string): void {
 }
 
 /**
+ * Validates input for potential XSS attacks
+ */
+export function validateNoXSS(input: string): void {
+  const xssPatterns = [
+    /<script[^>]*>[\s\S]*?<\/script>/gi,
+    /javascript:/gi,
+    /on\w+\s*=/gi,
+    /<iframe/gi,
+    /<embed/gi,
+    /<object/gi,
+    /data:/gi,
+    /vbscript:/gi,
+  ];
+
+  for (const pattern of xssPatterns) {
+    if (pattern.test(input)) {
+      throw new Error('Potentially malicious content detected');
+    }
+  }
+}
+
+/**
+ * Validates path traversal attempts
+ */
+export function validateNoPathTraversal(input: string): void {
+  const pathPatterns = [
+    /\.\.\//g,
+    /\.\.\\/,
+    /%2e%2e/gi,
+    /%252e/gi,
+  ];
+
+  for (const pattern of pathPatterns) {
+    if (pattern.test(input)) {
+      throw new Error('Invalid path detected');
+    }
+  }
+}
+
+/**
+ * Validates command injection attempts
+ */
+export function validateNoCommandInjection(input: string): void {
+  const cmdPatterns = [
+    /[;&|`$]/,
+    /\$\(/,
+    /`[^`]*`/,
+    /\|\|/,
+    /&&/,
+  ];
+
+  for (const pattern of cmdPatterns) {
+    if (pattern.test(input)) {
+      throw new Error('Invalid characters detected');
+    }
+  }
+}
+
+/**
+ * Comprehensive security validation
+ */
+export function validateSecureInput(input: string, options: {
+  maxLength?: number;
+  allowHtml?: boolean;
+  allowSpecialChars?: boolean;
+  fieldName?: string;
+} = {}): string {
+  const {
+    maxLength = 10000,
+    allowHtml = false,
+    allowSpecialChars = false,
+    fieldName = 'input',
+  } = options;
+
+  if (typeof input !== 'string') {
+    throw new Error(`${fieldName} must be a string`);
+  }
+
+  // Length validation
+  if (input.length > maxLength) {
+    throw new Error(`${fieldName} exceeds maximum length of ${maxLength} characters`);
+  }
+
+  // XSS validation
+  if (!allowHtml) {
+    validateNoXSS(input);
+  }
+
+  // Path traversal validation
+  validateNoPathTraversal(input);
+
+  // Command injection validation (for non-special char fields)
+  if (!allowSpecialChars) {
+    validateNoCommandInjection(input);
+  }
+
+  return input;
+}
+
+/**
+ * Validates and sanitizes API key format
+ */
+export function validateApiKey(key: string): boolean {
+  // API keys should be alphanumeric with optional dashes/underscores
+  // Typical format: sk_live_xxxx or similar
+  const apiKeyPattern = /^[a-zA-Z0-9_-]{20,100}$/;
+  return apiKeyPattern.test(key);
+}
+
+/**
+ * Masks sensitive data for logging
+ */
+export function maskSensitiveData(data: Record<string, unknown>): Record<string, unknown> {
+  const sensitiveKeys = [
+    'password',
+    'api_key',
+    'apiKey',
+    'secret',
+    'token',
+    'authorization',
+    'credit_card',
+    'creditCard',
+    'ssn',
+    'social_security',
+  ];
+
+  const masked: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    const lowerKey = key.toLowerCase();
+
+    if (sensitiveKeys.some(sk => lowerKey.includes(sk))) {
+      if (typeof value === 'string' && value.length > 4) {
+        masked[key] = `***${value.slice(-4)}`;
+      } else {
+        masked[key] = '***';
+      }
+    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      masked[key] = maskSensitiveData(value as Record<string, unknown>);
+    } else {
+      masked[key] = value;
+    }
+  }
+
+  return masked;
+}
+
+/**
+ * Rate limit key generation with sanitization
+ */
+export function generateRateLimitKey(clientId: string, operation: string): string {
+  const sanitizedClient = clientId.replace(/[^a-zA-Z0-9_-]/g, '');
+  const sanitizedOp = operation.replace(/[^a-zA-Z0-9_-]/g, '');
+  return `ratelimit:${sanitizedClient}:${sanitizedOp}`;
+}
+
+/**
  * Sanitize and validate tool arguments for security
  * @param args The raw arguments from the tool call
  * @param toolName The name of the tool being called

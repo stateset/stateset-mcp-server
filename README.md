@@ -20,35 +20,40 @@ A production-ready Model Context Protocol (MCP) server for StateSet API integrat
 ## 🚀 Features
 
 ### Core Capabilities
-- **100+ MCP Tools**: Complete CRUD operations for orders, returns, inventory, products, customers, shipments, manufacturing, and financial operations
+- **166 MCP Tools**: Complete CRUD operations for orders, returns, inventory, products, customers, shipments, manufacturing, and financial operations with full workflow support
 - **Advanced Search**: Multi-filter search with sorting, pagination, aggregations, and full-text search across all resources
 - **Batch Operations**: Execute multiple operations atomically with configurable parallelism and error handling
 - **Real-Time Updates**: WebSocket support for live event streaming and resource change notifications
 - **Resource Templates**: URI-based resource access (e.g., `stateset-order:///ORD-123`)
 
 ### Enterprise-Grade Reliability
-- **Intelligent Caching**: LRU/LFU/FIFO cache strategies with configurable TTL and automatic invalidation
+- **Intelligent Caching**: LRU/LFU/FIFO cache strategies with adaptive TTL, automatic cache warming, and optional Redis support for distributed caching
 - **Circuit Breaker**: Automatic failure detection and recovery to prevent cascade failures
 - **Rate Limiting**: Token bucket algorithm with per-tool limits and burst support
 - **Connection Pooling**: Efficient connection reuse with health checks and automatic reconnection
+- **Graceful Degradation**: Automatic fallback strategies with stale cache data when services are unavailable
+- **Retry Strategies**: Exponential backoff with jitter and intelligent error classification
 - **Graceful Shutdown**: Proper cleanup of connections, caches, and background tasks
 
 ### Security & Validation
-- **Input Sanitization**: XSS prevention, SQL injection protection, and HTML tag stripping
-- **API Key Security**: Automatic redaction in logs and error messages
+- **Input Sanitization**: XSS prevention, SQL injection protection, command injection detection, and HTML tag stripping
+- **Path Traversal Protection**: Detection and blocking of path traversal attempts
+- **API Key Security**: Automatic redaction in logs and error messages with sensitive data masking
 - **Request Validation**: Zod schemas with comprehensive type checking
 - **CORS & Helmet**: Security headers and cross-origin request protection
 
 ### Observability
-- **Structured Logging**: Pino-based JSON logging with request IDs and context
+- **Structured Logging**: Pino-based JSON logging with correlation IDs and request context
+- **Request Correlation**: Correlation IDs propagated through async operations for distributed tracing
 - **Prometheus Metrics**: Request counts, durations, error rates, cache hit rates, and queue lengths
+- **Tool Metrics**: Per-tool execution tracking with duration histograms, error rates, and category analysis
 - **Health Checks**: Liveness and readiness probes for Kubernetes deployments
 - **OpenTelemetry**: Distributed tracing support (optional)
-- **Performance Monitoring**: Request timing, retry tracking, and circuit breaker status
+- **Performance Monitoring**: Request timing, retry tracking, circuit breaker status, and slow tool detection
 
 ### Developer Experience
 - **Type-Safe**: Built with TypeScript 5.7 for maximum type safety and IntelliSense support
-- **Well-Tested**: 136 passing tests with unit, integration, and E2E coverage
+- **Well-Tested**: 203 passing tests across 14 test suites with unit, integration, and E2E coverage
 - **Hot Reloading**: Development mode with automatic restart on file changes
 - **OpenAPI Converter**: Generate MCP tools from OpenAPI specifications
 - **Comprehensive Documentation**: Detailed tool descriptions optimized for AI understanding
@@ -227,6 +232,15 @@ Copy `.env.example` to `.env` and configure the following variables:
 | `CACHE_TTL` | Cache time-to-live in seconds | `300` |
 | `CACHE_MAX_SIZE` | Maximum number of items to cache | `1000` |
 | `CACHE_STRATEGY` | Cache eviction strategy (lru/lfu/fifo) | `lru` |
+
+#### Redis Configuration (Optional)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REDIS_HOST` | Redis server hostname | `localhost` |
+| `REDIS_PORT` | Redis server port | `6379` |
+| `REDIS_PASSWORD` | Redis authentication password | (none) |
+| `REDIS_DB` | Redis database number | `0` |
 
 #### Circuit Breaker
 
@@ -513,19 +527,26 @@ src/
 ├── auth/               # Authentication templates and types
 ├── config/             # Configuration management and timeouts
 ├── core/              # Core infrastructure
+│   ├── adaptive-cache.ts        # Adaptive TTL and cache warming
 │   ├── advanced-metrics.ts      # Detailed performance metrics
 │   ├── batch-processor.ts       # Batch operation processing
-│   ├── cache.ts                 # Caching layer
+│   ├── cache.ts                 # In-memory caching layer
 │   ├── circuit-breaker.ts       # Circuit breaker pattern
 │   ├── connection-pool.ts       # Connection pooling
+│   ├── graceful-degradation.ts  # Fallback and degradation patterns
 │   ├── health.ts                # Health check implementation
+│   ├── hybrid-cache.ts          # Hybrid memory/Redis caching
 │   ├── intelligent-cache.ts     # Advanced caching strategies
 │   ├── metrics.ts               # Metrics collection
 │   ├── openapi-converter.ts     # OpenAPI to MCP conversion
 │   ├── performance-optimizer.ts # Performance tuning
 │   ├── rate-limiter.ts          # Rate limiting logic
 │   ├── realtime-manager.ts      # Real-time event management
+│   ├── redis-cache.ts           # Redis distributed caching
+│   ├── request-context.ts       # Correlation ID and request tracking
 │   ├── resource-registry.ts     # Resource handler registry
+│   ├── retry-strategy.ts        # Retry with exponential backoff
+│   ├── tool-metrics.ts          # Per-tool metrics collection
 │   ├── server-rate-limiter.ts   # Server-level rate limiting
 │   ├── telemetry.ts             # OpenTelemetry integration
 │   └── websocket.ts             # WebSocket server
@@ -580,36 +601,49 @@ src/
 
 ### Tools
 
-The server exposes 100+ MCP tools organized by domain:
+The server exposes 166 MCP tools organized by domain:
 
 #### Orders & Returns (RMA)
 - **Create**: `stateset_create_order`, `stateset_create_rma`
-- **Update**: `stateset_update_order`
-- **Get**: `stateset_get_order`, `stateset_get_rma`
+- **Update**: `stateset_update_order`, `stateset_update_order_status`
+- **Get**: `stateset_get_order`, `stateset_get_rma`, `stateset_get_order_items`
 - **List**: `stateset_list_orders`, `stateset_list_rmas`
 - **Delete**: `stateset_delete_order`
-- **Workflows**: `stateset_approve_return`, `stateset_restock_return`
+- **Workflows**: `stateset_approve_return`, `stateset_restock_return`, `stateset_cancel_order`, `stateset_archive_order`, `stateset_add_order_item`
 
 #### Inventory & Products
 - **Products**: `stateset_create_product`, `stateset_update_product`, `stateset_get_product`, `stateset_list_products`, `stateset_delete_product`
+- **Product Variants**: `stateset_get_product_variants`, `stateset_create_product_variant`, `stateset_update_product_variant_price`, `stateset_delete_product_variant`
 - **Inventory**: `stateset_create_inventory`, `stateset_update_inventory`, `stateset_get_inventory`, `stateset_list_inventories`, `stateset_delete_inventory`
+- **Inventory Workflows**: `stateset_reserve_inventory`, `stateset_release_inventory`, `stateset_get_low_stock`
 
 #### Fulfillment & Shipping
 - **Shipments**: `stateset_create_shipment`, `stateset_get_shipment`, `stateset_list_shipments`
-- **Workflows**: `stateset_mark_shipment_shipped`, `stateset_mark_shipment_delivered`
+- **Workflows**: `stateset_mark_shipment_shipped`, `stateset_mark_shipment_delivered`, `stateset_track_shipment`
 - **Fulfillment Orders**: `stateset_create_fulfillment_order`, `stateset_update_fulfillment_order`, `stateset_list_fulfillment_orders`
+
+#### Shopping Cart & Checkout
+- **Carts**: `stateset_create_cart`, `stateset_get_cart`, `stateset_delete_cart`, `stateset_list_carts`
+- **Cart Items**: `stateset_add_cart_item`, `stateset_update_cart_item`, `stateset_remove_cart_item`, `stateset_clear_cart`
+- **Checkout**: `stateset_create_checkout`, `stateset_get_checkout`, `stateset_update_checkout`, `stateset_complete_checkout`, `stateset_cancel_checkout`
 
 #### Manufacturing & Supply Chain
 - **Work Orders**: `stateset_create_work_order`, `stateset_update_work_order`, `stateset_get_work_order`, `stateset_list_work_orders`
+- **Work Order Workflows**: `stateset_assign_work_order`, `stateset_start_work_order`, `stateset_complete_work_order`, `stateset_hold_work_order`, `stateset_cancel_work_order`
 - **Bill of Materials**: `stateset_create_bill_of_materials`, `stateset_update_bill_of_materials`, `stateset_get_bill_of_materials`, `stateset_list_bill_of_materials`
+- **BOM Components**: `stateset_get_bom_components`, `stateset_add_bom_component`, `stateset_remove_bom_component`
 - **Purchase Orders**: `stateset_create_purchase_order`, `stateset_update_purchase_order`, `stateset_get_purchase_order`, `stateset_list_purchase_orders`
+- **PO Workflows**: `stateset_approve_purchase_order`, `stateset_cancel_purchase_order`, `stateset_receive_purchase_order`
 - **Manufacturer Orders**: `stateset_create_manufacturer_order`, `stateset_update_manufacturer_order`, `stateset_get_manufacturer_order`, `stateset_list_manufacturer_orders`
 - **ASN**: `stateset_create_asn`, `stateset_update_asn`, `stateset_get_asn`, `stateset_list_asns`
+- **ASN Workflows**: `stateset_mark_asn_in_transit`, `stateset_mark_asn_delivered`, `stateset_cancel_asn`
 - **Item Receipts**: `stateset_create_item_receipt`, `stateset_update_item_receipt`, `stateset_get_item_receipt`, `stateset_list_item_receipts`
+- **Suppliers**: `stateset_create_supplier`, `stateset_update_supplier`, `stateset_get_supplier`, `stateset_delete_supplier`, `stateset_list_suppliers`
 
 #### Financial Operations
 - **Invoices**: `stateset_create_invoice`, `stateset_update_invoice`, `stateset_get_invoice`, `stateset_list_invoices`, `stateset_delete_invoice`
 - **Payments**: `stateset_create_payment`, `stateset_update_payment`, `stateset_get_payment`, `stateset_list_payments`, `stateset_delete_payment`
+- **Payment Workflows**: `stateset_refund_payment`, `stateset_get_payments_by_order`
 - **Sales Orders**: `stateset_create_sales_order`, `stateset_update_sales_order`, `stateset_get_sales_order`, `stateset_list_sales_orders`
 - **Cash Sales**: `stateset_create_cash_sale`, `stateset_update_cash_sale`, `stateset_get_cash_sale`, `stateset_list_cash_sales`
 
@@ -619,12 +653,25 @@ The server exposes 100+ MCP tools organized by domain:
 - `stateset_get_customer` - Get customer details
 - `stateset_list_customers` - List all customers
 - `stateset_delete_customer` - Delete a customer
+- `stateset_get_customer_addresses` - Get customer addresses
+- `stateset_add_customer_address` - Add address to customer
 
 #### Warranties
 - `stateset_create_warranty` - Create warranty record
 - `stateset_update_warranty` - Update warranty details
 - `stateset_get_warranty` - Get warranty information
 - `stateset_list_warranties` - List all warranties
+- `stateset_extend_warranty` - Extend warranty period
+- `stateset_create_warranty_claim` - Create warranty claim
+- `stateset_approve_warranty_claim` - Approve warranty claim
+
+#### Analytics & Reporting
+- `stateset_get_dashboard_metrics` - Get key dashboard metrics
+- `stateset_get_sales_trends` - Get sales trends over time
+- `stateset_get_sales_metrics` - Get sales performance metrics
+- `stateset_get_inventory_metrics` - Get inventory metrics
+- `stateset_get_shipment_metrics` - Get shipment metrics
+- `stateset_get_cart_metrics` - Get cart abandonment metrics
 
 #### Advanced Search
 - `stateset_advanced_search` - Multi-filter search with sorting, pagination, and aggregations
@@ -678,7 +725,7 @@ const response = await client.readResource({
 
 The server provides a comprehensive prompt that includes:
 
-- **Tool Catalog**: Detailed descriptions of all 100+ tools organized by category
+- **Tool Catalog**: Detailed descriptions of all 166 tools organized by category
 - **Best Practices**: Guidelines for input validation, rate limiting, error handling, search/filtering, and batch processing
 - **Workflow Guidance**: Common patterns for orders, returns, fulfillment, manufacturing, inventory, and financial operations
 - **API Usage Tips**: Rate limit management, caching strategies, and performance optimization
@@ -728,7 +775,7 @@ npm run typecheck
 ### Running Tests
 
 ```bash
-# Run all tests (136 passing tests)
+# Run all tests (203 passing tests)
 npm test
 
 # Run tests in watch mode
@@ -744,8 +791,8 @@ npm run test:e2e
 ### Test Results
 
 ```
-Test Suites: 11 passed, 11 total
-Tests:       136 passed, 136 total
+Test Suites: 14 passed, 14 total
+Tests:       203 passed, 203 total
 ```
 
 ### Test Structure
@@ -753,21 +800,32 @@ Tests:       136 passed, 136 total
 ```
 tests/
 ├── unit/                           # Unit tests for individual components
+│   ├── batch-processor.test.ts    # Batch operation processing
 │   ├── cache.test.ts              # Cache functionality
 │   ├── circuit-breaker.test.ts    # Circuit breaker logic
 │   ├── connection-pool.test.ts    # Connection pooling
+│   ├── definitions.test.ts        # Tool definitions
+│   ├── dispatcher.test.ts         # Tool dispatcher
 │   ├── error-handler.test.ts      # Error handling
 │   ├── handlers.test.ts           # Request handlers
+│   ├── health.test.ts             # Health check functionality
 │   ├── intelligent-cache.test.ts  # Advanced caching
+│   ├── mcp-client.test.ts         # MCP client wrapper
 │   ├── metrics.test.ts            # Metrics collection
 │   ├── openapi-converter.test.ts  # OpenAPI conversion
+│   ├── rate-limiter.test.ts       # Rate limiting core
+│   ├── redis-cache.test.ts        # Redis cache integration
+│   ├── registry.test.ts           # Tool registry
 │   ├── schemas.test.ts            # Zod schema validation
 │   ├── server.test.ts             # Server initialization
 │   ├── stateset-client.test.ts    # API client
 │   ├── telemetry.test.ts          # Telemetry integration
-│   ├── tool-rate-limiter.test.ts  # Rate limiting
+│   ├── tool-rate-limiter.test.ts  # Tool-level rate limiting
 │   ├── validation.test.ts         # Input validation
 │   └── websocket.test.ts          # WebSocket functionality
+├── e2e/                            # End-to-end tests
+│   ├── mcp-server.e2e.test.ts     # MCP server integration
+│   └── workflow.e2e.test.ts       # Business workflow tests
 ├── setup.ts                        # Test setup and configuration
 └── teardown.ts                     # Test cleanup
 ```
@@ -777,13 +835,16 @@ tests/
 The test suite provides comprehensive coverage of:
 - ✅ Core MCP server functionality
 - ✅ Rate limiting and circuit breaker logic
-- ✅ Caching strategies (LRU/LFU/FIFO)
+- ✅ Caching strategies (LRU/LFU/FIFO) and Redis integration
 - ✅ Input validation and sanitization
 - ✅ Error handling and formatting
 - ✅ WebSocket connections
 - ✅ Metrics collection
 - ✅ Connection pooling
 - ✅ OpenAPI conversion
+- ✅ Tool dispatcher and registry
+- ✅ Batch processor operations
+- ✅ Health check endpoints
 
 ### Writing Tests
 
@@ -1105,10 +1166,21 @@ LOG_LEVEL=debug npm run dev
 
 ## 🗺️ Roadmap
 
+### Recently Completed
+
+- [x] Redis-based distributed caching
+- [x] Hybrid memory/Redis cache with automatic fallback
+- [x] Request correlation IDs for distributed tracing
+- [x] Retry strategies with exponential backoff and jitter
+- [x] Adaptive cache with automatic TTL tuning and cache warming
+- [x] Graceful degradation with automatic fallbacks
+- [x] Per-tool metrics collection with duration histograms
+- [x] Enhanced input validation (XSS, command injection, path traversal protection)
+- [x] Sensitive data masking in logs
+
 ### Coming Soon
 
 - [ ] GraphQL API support
-- [ ] Redis-based distributed caching
 - [ ] Webhook event delivery
 - [ ] Multi-tenant support
 - [ ] Enhanced AI insights and predictions

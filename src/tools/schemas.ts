@@ -606,3 +606,396 @@ export const ListArgsSchema = z.object({
 });
 
 export const GetApiMetricsArgsSchema = z.object({});
+
+// ================================
+// ORDER WORKFLOW SCHEMAS
+// ================================
+export const CancelOrderArgsSchema = z.object({
+  order_id: z.string().min(1, 'Order ID is required'),
+  reason: z.string().optional(),
+});
+
+export const ArchiveOrderArgsSchema = z.object({
+  order_id: z.string().min(1, 'Order ID is required'),
+});
+
+export const UpdateOrderStatusArgsSchema = z.object({
+  order_id: z.string().min(1, 'Order ID is required'),
+  status: z.enum(['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned']),
+});
+
+export const GetOrderItemsArgsSchema = z.object({
+  order_id: z.string().min(1, 'Order ID is required'),
+});
+
+export const AddOrderItemArgsSchema = z.object({
+  order_id: z.string().min(1, 'Order ID is required'),
+  product_id: z.string().min(1, 'Product ID is required'),
+  quantity: z.number().int().positive('Quantity must be positive'),
+  unit_price: z.number().positive('Unit price must be positive').optional(),
+});
+
+// ================================
+// INVENTORY WORKFLOW SCHEMAS
+// ================================
+export const ReserveInventoryArgsSchema = z.object({
+  inventory_id: z.string().uuid('Inventory ID must be a valid UUID'),
+  location_id: z.number().int().positive('Location ID is required'),
+  quantity: z.number().int().positive('Quantity must be positive'),
+  reference_id: z.string().min(1, 'Reference ID is required'),
+  reference_type: z.enum(['order', 'transfer', 'work_order']),
+});
+
+export const ReleaseInventoryArgsSchema = z.object({
+  inventory_id: z.string().uuid('Inventory ID must be a valid UUID'),
+  location_id: z.number().int().positive('Location ID is required'),
+  quantity: z.number().int().positive('Quantity must be positive'),
+});
+
+export const GetLowStockArgsSchema = z.object({
+  threshold: z.number().int().nonnegative().optional(),
+  location_id: z.number().int().positive().optional(),
+});
+
+// ================================
+// SHIPMENT WORKFLOW SCHEMAS
+// ================================
+export const TrackShipmentArgsSchema = z.object({
+  shipment_id: z.string().uuid('Shipment ID must be a valid UUID').optional(),
+  tracking_number: z.string().min(1, 'Tracking number is required').optional(),
+});
+
+// ================================
+// WARRANTY WORKFLOW SCHEMAS
+// ================================
+export const ExtendWarrantyArgsSchema = z.object({
+  warranty_id: z.string().min(1, 'Warranty ID is required'),
+  extension_months: z.number().int().positive('Extension months must be positive'),
+});
+
+export const CreateWarrantyClaimArgsSchema = z.object({
+  warranty_id: z.string().min(1, 'Warranty ID is required'),
+  claim_reason: z.string().min(1, 'Claim reason is required'),
+  claim_amount: z.number().positive('Claim amount must be positive').optional(),
+});
+
+export const ApproveWarrantyClaimArgsSchema = z.object({
+  claim_id: z.string().min(1, 'Claim ID is required'),
+  approved_amount: z.number().positive('Approved amount must be positive').optional(),
+  notes: z.string().optional(),
+});
+
+// ================================
+// WORK ORDER WORKFLOW SCHEMAS
+// ================================
+export const AssignWorkOrderArgsSchema = z.object({
+  work_order_id: z.string().min(1, 'Work Order ID is required'),
+  assigned_to: z.string().min(1, 'Assignee is required'),
+});
+
+export const CompleteWorkOrderArgsSchema = z.object({
+  work_order_id: z.string().min(1, 'Work Order ID is required'),
+  notes: z.string().optional(),
+});
+
+export const StartWorkOrderArgsSchema = z.object({
+  work_order_id: z.string().min(1, 'Work Order ID is required'),
+});
+
+export const HoldWorkOrderArgsSchema = z.object({
+  work_order_id: z.string().min(1, 'Work Order ID is required'),
+  reason: z.string().min(1, 'Hold reason is required'),
+});
+
+export const CancelWorkOrderArgsSchema = z.object({
+  work_order_id: z.string().min(1, 'Work Order ID is required'),
+  reason: z.string().optional(),
+});
+
+// ================================
+// PRODUCT VARIANT SCHEMAS
+// ================================
+export const GetProductVariantsArgsSchema = z.object({
+  product_id: z.string().min(1, 'Product ID is required'),
+});
+
+export const CreateProductVariantArgsSchema = z.object({
+  product_id: z.string().min(1, 'Product ID is required'),
+  sku: z.string().min(1, 'SKU is required'),
+  name: z.string().min(1, 'Name is required'),
+  price: z.number().positive('Price must be positive'),
+  currency: z.string().length(3, 'Currency must be 3 characters').default('USD'),
+  quantity: z.number().int().nonnegative().optional(),
+  attributes: z.record(z.string()).optional(),
+});
+
+export const UpdateProductVariantPriceArgsSchema = z.object({
+  variant_id: z.string().min(1, 'Variant ID is required'),
+  price: z.number().positive('Price must be positive'),
+  currency: z.string().length(3, 'Currency must be 3 characters').optional(),
+});
+
+export const DeleteProductVariantArgsSchema = z.object({
+  variant_id: z.string().min(1, 'Variant ID is required'),
+});
+
+// ================================
+// CART SCHEMAS
+// ================================
+export const CreateCartArgsSchema = z.object({
+  customer_id: z.string().min(1, 'Customer ID is required'),
+});
+
+export const GetCartArgsSchema = z.object({
+  cart_id: z.string().min(1, 'Cart ID is required'),
+});
+
+export const DeleteCartArgsSchema = z.object({
+  cart_id: z.string().min(1, 'Cart ID is required'),
+});
+
+export const AddCartItemArgsSchema = z.object({
+  cart_id: z.string().min(1, 'Cart ID is required'),
+  product_variant_id: z.string().min(1, 'Product variant ID is required'),
+  quantity: z.number().int().positive('Quantity must be positive'),
+});
+
+export const UpdateCartItemArgsSchema = z.object({
+  cart_id: z.string().min(1, 'Cart ID is required'),
+  item_id: z.string().min(1, 'Item ID is required'),
+  quantity: z.number().int().positive('Quantity must be positive'),
+});
+
+export const RemoveCartItemArgsSchema = z.object({
+  cart_id: z.string().min(1, 'Cart ID is required'),
+  item_id: z.string().min(1, 'Item ID is required'),
+});
+
+export const ClearCartArgsSchema = z.object({
+  cart_id: z.string().min(1, 'Cart ID is required'),
+});
+
+export const ListCartsArgsSchema = z.object({
+  customer_id: z.string().min(1, 'Customer ID is required').optional(),
+  page: z.number().positive().optional(),
+  per_page: z.number().positive().optional(),
+});
+
+// ================================
+// CHECKOUT SCHEMAS
+// ================================
+export const CreateCheckoutArgsSchema = z.object({
+  cart_id: z.string().min(1, 'Cart ID is required'),
+  shipping_method: z.string().min(1, 'Shipping method is required'),
+  payment_method: z.string().min(1, 'Payment method is required'),
+});
+
+export const GetCheckoutArgsSchema = z.object({
+  checkout_id: z.string().min(1, 'Checkout ID is required'),
+});
+
+export const UpdateCheckoutArgsSchema = z.object({
+  checkout_id: z.string().min(1, 'Checkout ID is required'),
+  shipping_address: z
+    .object({
+      street: z.string().min(1),
+      city: z.string().min(1),
+      state: z.string().min(2),
+      postal_code: z.string().min(3),
+      country: z.string().min(2),
+    })
+    .optional(),
+  billing_address: z
+    .object({
+      street: z.string().min(1),
+      city: z.string().min(1),
+      state: z.string().min(2),
+      postal_code: z.string().min(3),
+      country: z.string().min(2),
+    })
+    .optional(),
+  shipping_method: z.string().optional(),
+  payment_method: z.string().optional(),
+});
+
+export const CompleteCheckoutArgsSchema = z.object({
+  checkout_id: z.string().min(1, 'Checkout ID is required'),
+});
+
+export const CancelCheckoutArgsSchema = z.object({
+  checkout_id: z.string().min(1, 'Checkout ID is required'),
+});
+
+// ================================
+// PAYMENT WORKFLOW SCHEMAS
+// ================================
+export const RefundPaymentArgsSchema = z.object({
+  payment_id: z.string().min(1, 'Payment ID is required'),
+  refund_amount: z.number().positive('Refund amount must be positive'),
+  refund_reason: z.string().min(1, 'Refund reason is required'),
+});
+
+export const GetPaymentsByOrderArgsSchema = z.object({
+  order_id: z.string().min(1, 'Order ID is required'),
+});
+
+// ================================
+// CUSTOMER WORKFLOW SCHEMAS
+// ================================
+export const GetCustomerAddressesArgsSchema = z.object({
+  customer_id: z.string().min(1, 'Customer ID is required'),
+});
+
+export const AddCustomerAddressArgsSchema = z.object({
+  customer_id: z.string().min(1, 'Customer ID is required'),
+  address: z.object({
+    street: z.string().min(1, 'Street is required'),
+    city: z.string().min(1, 'City is required'),
+    state: z.string().min(2, 'State is required'),
+    postal_code: z.string().min(3, 'Postal code is required'),
+    country: z.string().min(2, 'Country is required'),
+    is_default: z.boolean().optional(),
+    address_type: z.enum(['shipping', 'billing', 'both']).optional(),
+  }),
+});
+
+// ================================
+// PURCHASE ORDER WORKFLOW SCHEMAS
+// ================================
+export const ApprovePurchaseOrderArgsSchema = z.object({
+  purchase_order_id: z.string().min(1, 'Purchase Order ID is required'),
+});
+
+export const CancelPurchaseOrderArgsSchema = z.object({
+  purchase_order_id: z.string().min(1, 'Purchase Order ID is required'),
+  reason: z.string().optional(),
+});
+
+export const ReceivePurchaseOrderArgsSchema = z.object({
+  purchase_order_id: z.string().min(1, 'Purchase Order ID is required'),
+  items: z
+    .array(
+      z.object({
+        item_id: z.string().min(1, 'Item ID is required'),
+        quantity_received: z.number().int().positive('Quantity must be positive'),
+      }),
+    )
+    .min(1, 'At least one item is required'),
+  notes: z.string().optional(),
+});
+
+// ================================
+// ASN WORKFLOW SCHEMAS
+// ================================
+export const MarkASNInTransitArgsSchema = z.object({
+  asn_id: z.string().min(1, 'ASN ID is required'),
+  tracking_number: z.string().optional(),
+  estimated_delivery: z.string().datetime().optional(),
+});
+
+export const MarkASNDeliveredArgsSchema = z.object({
+  asn_id: z.string().min(1, 'ASN ID is required'),
+  delivery_date: z.string().datetime().optional(),
+  notes: z.string().optional(),
+});
+
+export const CancelASNArgsSchema = z.object({
+  asn_id: z.string().min(1, 'ASN ID is required'),
+  reason: z.string().optional(),
+});
+
+// ================================
+// BOM WORKFLOW SCHEMAS
+// ================================
+export const GetBOMComponentsArgsSchema = z.object({
+  bill_of_materials_id: z.string().min(1, 'Bill of Materials ID is required'),
+});
+
+export const AddBOMComponentArgsSchema = z.object({
+  bill_of_materials_id: z.string().min(1, 'Bill of Materials ID is required'),
+  component_id: z.string().min(1, 'Component ID is required'),
+  quantity: z.number().positive('Quantity must be positive'),
+  unit_of_measure: z.string().optional(),
+  sequence: z.number().int().positive().optional(),
+});
+
+export const RemoveBOMComponentArgsSchema = z.object({
+  bill_of_materials_id: z.string().min(1, 'Bill of Materials ID is required'),
+  component_id: z.string().min(1, 'Component ID is required'),
+});
+
+// ================================
+// ANALYTICS SCHEMAS
+// ================================
+export const GetDashboardMetricsArgsSchema = z.object({});
+
+export const GetSalesTrendsArgsSchema = z.object({
+  from_date: z.string().datetime().optional(),
+  to_date: z.string().datetime().optional(),
+  interval: z.enum(['daily', 'weekly', 'monthly']).default('daily'),
+});
+
+export const GetSalesMetricsArgsSchema = z.object({
+  from_date: z.string().datetime().optional(),
+  to_date: z.string().datetime().optional(),
+});
+
+export const GetInventoryMetricsArgsSchema = z.object({
+  location_id: z.number().int().positive().optional(),
+});
+
+export const GetShipmentMetricsArgsSchema = z.object({
+  from_date: z.string().datetime().optional(),
+  to_date: z.string().datetime().optional(),
+});
+
+export const GetCartMetricsArgsSchema = z.object({
+  from_date: z.string().datetime().optional(),
+  to_date: z.string().datetime().optional(),
+});
+
+// ================================
+// SUPPLIER SCHEMAS
+// ================================
+export const CreateSupplierArgsSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email format'),
+  phone: z.string().optional(),
+  address: z
+    .object({
+      street: z.string().min(1),
+      city: z.string().min(1),
+      state: z.string().min(2),
+      postal_code: z.string().min(3),
+      country: z.string().min(2),
+    })
+    .optional(),
+  contact_name: z.string().optional(),
+  payment_terms: z.string().optional(),
+});
+
+export const UpdateSupplierArgsSchema = z.object({
+  supplier_id: z.string().min(1, 'Supplier ID is required'),
+  name: z.string().optional(),
+  email: z.string().email('Invalid email format').optional(),
+  phone: z.string().optional(),
+  address: z
+    .object({
+      street: z.string().min(1),
+      city: z.string().min(1),
+      state: z.string().min(2),
+      postal_code: z.string().min(3),
+      country: z.string().min(2),
+    })
+    .optional(),
+  contact_name: z.string().optional(),
+  payment_terms: z.string().optional(),
+});
+
+export const GetSupplierArgsSchema = z.object({
+  supplier_id: z.string().min(1, 'Supplier ID is required'),
+});
+
+export const DeleteSupplierArgsSchema = z.object({
+  supplier_id: z.string().min(1, 'Supplier ID is required'),
+});

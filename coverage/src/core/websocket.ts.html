@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">13.4% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/97</span>
+                <span class='fraction'>13/97</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">4% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/25</span>
+                <span class='fraction'>1/25</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">9.09% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/22</span>
+                <span class='fraction'>2/22</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">14.13% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/92</span>
+                <span class='fraction'>13/92</span>
             </div>
         
             
@@ -342,13 +342,13 @@
 <a name='L277'></a><a href='#L277'>277</a>
 <a name='L278'></a><a href='#L278'>278</a>
 <a name='L279'></a><a href='#L279'>279</a>
-<a name='L280'></a><a href='#L280'>280</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<a name='L280'></a><a href='#L280'>280</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -363,21 +363,21 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -620,14 +620,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import { WebSocket, WebSocketServer } from 'ws';</span>
-<span class="cstat-no" title="statement not covered" >import { EventEmitter } from 'events';</span>
-<span class="cstat-no" title="statement not covered" >import { createLogger } from '../utils/logger';</span>
-<span class="cstat-no" title="statement not covered" >import { config } from '../config';</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { WebSocket, WebSocketServer } from 'ws';
+import { EventEmitter } from 'events';
+import { createLogger } from '../utils/logger';
+import { config } from '../config';
 import type { IncomingMessage } from 'http';
 &nbsp;
-const logger = <span class="cstat-no" title="statement not covered" >createLogger('websocket');</span>
+const logger = createLogger('websocket');
 &nbsp;
 export interface WebSocketMessage {
   type: 'subscribe' | 'unsubscribe' | 'update' | 'error';
@@ -642,21 +642,21 @@ export interface WebSocketSubscription {
   ws: WebSocket;
 }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >export class W</span>ebSocketManager extends EventEmitter {
+export class WebSocketManager extends EventEmitter {
   private static instance: WebSocketManager;
   private wss?: WebSocketServer;
-  private subscriptions: Map&lt;string, WebSocketSubscription&gt; = <span class="cstat-no" title="statement not covered" >new Map();</span>
-  private channels: Map&lt;string, Set&lt;string&gt;&gt; = <span class="cstat-no" title="statement not covered" >new Map();</span> // channel -&gt; subscription IDs
+  private subscriptions: Map&lt;string, WebSocketSubscription&gt; = new Map();
+  private channels: Map&lt;string, Set&lt;string&gt;&gt; = new Map(); // channel -&gt; subscription IDs
 &nbsp;
-<span class="fstat-no" title="function not covered" >  private constructor() {</span>
-<span class="cstat-no" title="statement not covered" >    super();</span>
+  private constructor() {
+    super();
   }
 &nbsp;
-<span class="fstat-no" title="function not covered" >  static </span>getInstance(): WebSocketManager {
-<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (!WebSocketManager.instance) {</span>
-<span class="cstat-no" title="statement not covered" >      WebSocketManager.instance = new WebSocketManager();</span>
+  static getInstance(): WebSocketManager {
+    if (!WebSocketManager.instance) {
+      WebSocketManager.instance = new WebSocketManager();
     }
-<span class="cstat-no" title="statement not covered" >    return WebSocketManager.instance;</span>
+    return WebSocketManager.instance;
   }
 &nbsp;
   /**
@@ -899,7 +899,7 @@ export interface WebSocketSubscription {
 }
 &nbsp;
 // Export singleton instance
-export const <span class="cstat-no" title="statement not covered" >wsManager = WebSocketManager.getInstance();</span>
+export const wsManager = WebSocketManager.getInstance();
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -907,7 +907,7 @@ export const <span class="cstat-no" title="statement not covered" >wsManager = W
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-25T19:42:44.818Z
+                at 2025-12-01T19:30:26.135Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

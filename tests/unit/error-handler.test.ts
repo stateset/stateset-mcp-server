@@ -49,7 +49,9 @@ describe('Error Handler', () => {
     const result = handleError(error, context);
 
     expect(result).toBeInstanceOf(APIError);
-    expect(result.context).toEqual(context);
+    expect(result.context).toMatchObject(context);
+    // correlationId is automatically added
+    expect(result.context?.correlationId).toBeDefined();
   });
 
   it('should return APIError as-is if already an APIError', () => {
