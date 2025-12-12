@@ -226,6 +226,7 @@ export class BatchProcessor<T, R> extends EventEmitter {
 
     this.processing = true;
     const startTime = Date.now();
+    let currentBatch: BatchOperation<T, R>[] = [];
 
     try {
       // Sort by priority if enabled
@@ -246,6 +247,7 @@ export class BatchProcessor<T, R> extends EventEmitter {
       const now = Date.now();
       const timedOut = batch.filter((op) => now - op.timestamp > op.timeout);
       const valid = batch.filter((op) => now - op.timestamp <= op.timeout);
+      currentBatch = valid;
 
       // Reject timed-out operations
       timedOut.forEach((op) => {
@@ -322,10 +324,8 @@ export class BatchProcessor<T, R> extends EventEmitter {
     } catch (error) {
       logger.error('Batch processing failed', { error });
 
-      // Handle batch failure - retry eligible operations
-      const batch = this.queue.splice(0, Math.min(this.queue.length, this.getAdaptiveBatchSize()));
-
-      for (const operation of batch) {
+      // Handle batch failure - retry eligible operations from the current batch
+      for (const operation of currentBatch) {
         if (operation.retries < operation.maxRetries) {
           operation.retries++;
           this.queue.unshift(operation); // Add back to front for retry

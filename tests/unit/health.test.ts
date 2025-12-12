@@ -1,12 +1,13 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 
 // Mock dependencies
-jest.mock('../../src/config', () => ({
+jest.mock('@config/index', () => ({
   config: {
-    api: { timeout: 10000 },
+    api: { timeout: 10000, baseUrl: undefined },
     cache: { enabled: true },
     rateLimit: { requestsPerHour: 1000 },
-    monitoring: { enabled: false }, // Disable monitoring to avoid timers
+    monitoring: { enabled: false, healthCheckInterval: 30000 }, // Disable monitoring to avoid timers
+    server: { version: '1.0.0' },
   },
 }));
 
@@ -16,12 +17,14 @@ jest.mock('../../src/utils/logger', () => ({
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
+    logHealthCheck: jest.fn(),
   }),
 }));
 
 jest.mock('../../src/core/metrics', () => ({
   metrics: {
-    getAll: jest.fn().mockReturnValue({}),
+    observe: jest.fn(),
+    set: jest.fn(),
   },
 }));
 
@@ -38,7 +41,7 @@ describe('HealthChecker', () => {
   });
 
   afterEach(() => {
-    healthChecker.destroy();
+    healthChecker.stopMonitoring();
   });
 
   describe('Initialization', () => {
@@ -81,7 +84,7 @@ describe('HealthChecker', () => {
 
   describe('Custom checks', () => {
     it('should register custom health check', () => {
-      const customCheck = jest.fn().mockResolvedValue({
+      const customCheck = (jest.fn() as any).mockResolvedValue({
         name: 'custom',
         status: HealthStatus.HEALTHY,
         duration: 10,
@@ -95,7 +98,7 @@ describe('HealthChecker', () => {
     });
 
     it('should execute registered health checks', async () => {
-      const customCheck = jest.fn().mockResolvedValue({
+      const customCheck = (jest.fn() as any).mockResolvedValue({
         name: 'custom',
         status: HealthStatus.HEALTHY,
         duration: 10,
@@ -143,7 +146,7 @@ describe('HealthChecker', () => {
 
   describe('Error handling', () => {
     it('should handle check errors gracefully', async () => {
-      const failingCheck = jest.fn().mockRejectedValue(new Error('Check failed'));
+      const failingCheck = (jest.fn() as any).mockRejectedValue(new Error('Check failed'));
 
       healthChecker.register('failing', failingCheck);
 
@@ -158,7 +161,7 @@ describe('HealthChecker', () => {
       const testChecker = new HealthChecker();
 
       // Should not throw
-      expect(() => testChecker.destroy()).not.toThrow();
+      expect(() => testChecker.stopMonitoring()).not.toThrow();
     });
   });
 });

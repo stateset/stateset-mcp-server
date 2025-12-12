@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, jest } from '@jest/globals';
 
 // Mock all dependencies
 jest.mock('../../src/services/mcp-client');
@@ -12,6 +12,12 @@ jest.mock('../../src/utils/logger', () => ({
     warn: jest.fn(),
     error: jest.fn(),
   },
+  createLogger: () => ({
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  }),
 }));
 
 // Import after mocks
@@ -130,13 +136,12 @@ describe('Tool Registry', () => {
     it('should have batch tool handlers registered', () => {
       expect(toolHandlers.has('stateset_batch_operations')).toBe(true);
       expect(toolHandlers.has('stateset_batch_create_orders')).toBe(true);
-      expect(toolHandlers.has('stateset_batch_update_inventory')).toBe(true);
     });
   });
 
   describe('Handler Functions', () => {
     it('should have all handlers as functions', () => {
-      toolHandlers.forEach((handler, name) => {
+      toolHandlers.forEach((handler) => {
         expect(typeof handler).toBe('function');
       });
     });

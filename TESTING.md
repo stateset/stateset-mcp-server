@@ -39,10 +39,10 @@ npm test -- --detectOpenHandles
 
 | Metric     | Current | Target  |
 |------------|---------|---------|
-| Statements | ~13%    | 80%+    |
-| Branches   | ~10%    | 80%+    |
-| Functions  | ~8%     | 80%+    |
-| Lines      | ~13%    | 80%+    |
+| Statements | 38.6%   | 80%+    |
+| Branches   | 26.6%   | 80%+    |
+| Functions  | 26.4%   | 80%+    |
+| Lines      | 39.3%   | 80%+    |
 
 ### Well-Tested Modules
 
@@ -53,10 +53,10 @@ npm test -- --detectOpenHandles
 
 ### Modules Needing Tests
 
-- ⚠️ **server.ts** - 0% coverage (main entry point)
-- ⚠️ **stateset-client.ts** - 0% coverage (core API client)
-- ⚠️ **mcp-client.ts** - 0% coverage (MCP implementation)
-- ⚠️ **tools/registry.ts** - 0% coverage (tool management)
+- ⚠️ **server.ts** - low coverage (entry point is hard to unit test)
+- ⚠️ **stateset-client.ts** - partial coverage; add more edge/error cases
+- ⚠️ **mcp-client.ts** - partial coverage; expand error/timeout paths
+- ⚠️ **tools/registry.ts** - mostly structural tests; add behavior tests
 
 ## Writing Tests
 

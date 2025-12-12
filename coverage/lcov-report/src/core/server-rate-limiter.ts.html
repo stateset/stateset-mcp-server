@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">7.63% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/131</span>
+                <span class='fraction'>10/131</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">4.16% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/24</span>
+                <span class='fraction'>1/24</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">8.33% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/120</span>
+                <span class='fraction'>10/120</span>
             </div>
         
             
@@ -359,12 +359,12 @@
 <a name='L294'></a><a href='#L294'>294</a>
 <a name='L295'></a><a href='#L295'>295</a>
 <a name='L296'></a><a href='#L296'>296</a>
-<a name='L297'></a><a href='#L297'>297</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<a name='L297'></a><a href='#L297'>297</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -491,8 +491,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -508,11 +508,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -524,8 +524,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -654,13 +654,13 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import axios from 'axios';</span>
-<span class="cstat-no" title="statement not covered" >import { logger } from '../utils/logger';</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import axios from 'axios';
+import { logger } from '../utils/logger';
 import { RateLimiterMetrics } from '../types/mcp-api';
 &nbsp;
 // Rate Limiter
-<span class="cstat-no" title="statement not covered" >export class R</span>ateLimiter {
+export class RateLimiter {
   private readonly requestsPerHour: number;
   private readonly minDelayMs: number;
   private queue: Array&lt;() =&gt; Promise&lt;any&gt;&gt; = <span class="cstat-no" title="statement not covered" >[];</span>
@@ -787,8 +787,8 @@ export interface ToolRateLimitMetrics {
 }
 &nbsp;
 // Per-Tool Rate Limiter with Token Bucket Algorithm
-<span class="cstat-no" title="statement not covered" >export class T</span>oolRateLimiter {
-  private readonly limits: Record&lt;ToolCategory, ToolRateLimitConfig&gt; = <span class="cstat-no" title="statement not covered" >{</span>
+export class ToolRateLimiter {
+  private readonly limits: Record&lt;ToolCategory, ToolRateLimitConfig&gt; = {
     read: { requestsPerMinute: 120, burstSize: 20 }, // High throughput for reads
     create: { requestsPerMinute: 30, burstSize: 5 }, // Moderate for creates
     update: { requestsPerMinute: 60, burstSize: 10 }, // Medium for updates
@@ -804,11 +804,11 @@ export interface ToolRateLimitMetrics {
       lastRefill: number;
       requestTimestamps: number[];
     }
-  &gt; = <span class="cstat-no" title="statement not covered" >new Map();</span>
+  &gt; = new Map();
 &nbsp;
-<span class="fstat-no" title="function not covered" >  constructor(c</span>ustomLimits?: Partial&lt;Record&lt;ToolCategory, ToolRateLimitConfig&gt;&gt;) {
+  constructor(customLimits?: Partial&lt;Record&lt;ToolCategory, ToolRateLimitConfig&gt;&gt;) {
     // Apply custom limits if provided
-<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (customLimits) {</span>
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (customLimits) {
 <span class="cstat-no" title="statement not covered" >      for (const [category, config] of Object.entries(customLimits)) {</span>
 <span class="cstat-no" title="statement not covered" >        <span class="missing-if-branch" title="if path not taken" >I</span>if (this.limits[category as ToolCategory]) {</span>
 <span class="cstat-no" title="statement not covered" >          this.limits[category as ToolCategory] = {</span>
@@ -820,8 +820,8 @@ export interface ToolRateLimitMetrics {
     }
 &nbsp;
     // Initialize buckets for each category
-<span class="cstat-no" title="statement not covered" >    for (const category of Object.keys(this.limits) as ToolCategory[]) {</span>
-<span class="cstat-no" title="statement not covered" >      this.buckets.set(category, {</span>
+    for (const category of Object.keys(this.limits) as ToolCategory[]) {
+      this.buckets.set(category, {
         tokens: this.limits[category].burstSize,
         lastRefill: Date.now(),
         requestTimestamps: [],
@@ -950,7 +950,7 @@ export interface ToolRateLimitMetrics {
 }
 &nbsp;
 // Singleton tool rate limiter
-export const <span class="cstat-no" title="statement not covered" >toolRateLimiter = new ToolRateLimiter();</span>
+export const toolRateLimiter = new ToolRateLimiter();
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -958,7 +958,7 @@ export const <span class="cstat-no" title="statement not covered" >toolRateLimit
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-12-01T19:30:26.050Z
+                at 2025-12-11T23:50:26.235Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

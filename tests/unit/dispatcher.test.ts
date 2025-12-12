@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { handleToolCall } from '../../src/tools/dispatcher';
 import { CallToolRequest } from '@modelcontextprotocol/sdk/types.js';
 
@@ -14,7 +14,7 @@ jest.mock('../../src/utils/logger', () => ({
 
 jest.mock('../../src/core/server-rate-limiter', () => ({
   toolRateLimiter: {
-    waitAndAcquire: jest.fn().mockResolvedValue('read'),
+    waitAndAcquire: (jest.fn() as any).mockResolvedValue('read'),
   },
 }));
 
@@ -24,21 +24,25 @@ jest.mock('../../src/utils/validation', () => ({
 }));
 
 // Mock the toolHandlers Map
-const mockHandler = jest.fn();
-jest.mock('../../src/tools/registry', () => ({
-  toolHandlers: new Map([
+jest.mock('../../src/tools/registry', () => {
+  const mockHandler = jest.fn();
+  const toolHandlers = new Map([
     ['stateset_test_tool', mockHandler],
-    ['stateset_health_check', jest.fn().mockResolvedValue({ status: 'healthy' })],
-  ]),
-}));
+    ['stateset_health_check', (jest.fn() as any).mockResolvedValue({ status: 'healthy' })],
+  ]);
+  return { toolHandlers };
+});
 
 describe('Tool Dispatcher', () => {
   const mockClient = {
-    healthCheck: jest.fn().mockResolvedValue({ status: 'healthy' }),
+    healthCheck: (jest.fn() as any).mockResolvedValue({ status: 'healthy' }),
   } as any;
+  let mockHandler: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    const { toolHandlers } = require('../../src/tools/registry');
+    mockHandler = toolHandlers.get('stateset_test_tool');
     mockHandler.mockReset();
     mockHandler.mockResolvedValue({ success: true });
   });
@@ -120,7 +124,7 @@ describe('Tool Dispatcher', () => {
 
     it('should propagate handler errors', async () => {
       const error = new Error('Handler failed');
-      mockHandler.mockRejectedValue(error);
+      (mockHandler as any).mockRejectedValue(error);
 
       const request: CallToolRequest = {
         method: 'tools/call',

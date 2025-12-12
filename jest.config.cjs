@@ -10,17 +10,11 @@ module.exports = {
   testPathIgnorePatterns: [
     '/node_modules/',
     '/dist/',
-    'stateset-client.test.ts',
     'intelligent-cache.test.ts',
     'openapi-converter.test.ts',
-    'connection-pool.test.ts',
     'e2e/',  // E2E tests require built dist and real server connections
-    // Tests with complex module dependencies - excluded until mocking improved
-    'dispatcher.test.ts',
-    'registry.test.ts',
-    'mcp-client.test.ts',
-    'batch-processor.test.ts',
-    'health.test.ts',
+    // Experimental features - excluded from default suite
+    'connection-pool.test.ts.disabled',
   ],
   transform: {
     '^.+\\.(ts|tsx)$': [

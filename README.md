@@ -53,7 +53,7 @@ A production-ready Model Context Protocol (MCP) server for StateSet API integrat
 
 ### Developer Experience
 - **Type-Safe**: Built with TypeScript 5.7 for maximum type safety and IntelliSense support
-- **Well-Tested**: 203 passing tests across 14 test suites with unit, integration, and E2E coverage
+- **Well-Tested**: 297 passing tests across 21 test suites with unit and E2E coverage
 - **Hot Reloading**: Development mode with automatic restart on file changes
 - **OpenAPI Converter**: Generate MCP tools from OpenAPI specifications
 - **Comprehensive Documentation**: Detailed tool descriptions optimized for AI understanding
@@ -775,7 +775,7 @@ npm run typecheck
 ### Running Tests
 
 ```bash
-# Run all tests (203 passing tests)
+# Run all tests (297 passing tests)
 npm test
 
 # Run tests in watch mode

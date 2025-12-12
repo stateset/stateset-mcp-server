@@ -12,8 +12,10 @@ jest.mock('../../src/utils/logger', () => ({
 
 jest.mock('../../src/core/metrics', () => ({
   metrics: {
-    recordBatchOperation: jest.fn(),
-    recordProcessingTime: jest.fn(),
+    incrementCounter: jest.fn(),
+    recordHistogram: jest.fn(),
+    setGauge: jest.fn(),
+    profile: jest.fn((_name: string, fn: any) => fn()),
   },
 }));
 
@@ -22,14 +24,14 @@ import { BatchProcessor } from '../../src/core/batch-processor';
 
 describe('BatchProcessor', () => {
   let processor: BatchProcessor<string, string>;
-  let mockProcessFn: jest.Mock;
+  let mockProcessFn: any;
 
   beforeEach(() => {
-    mockProcessFn = jest.fn().mockImplementation(async (items: string[]) => {
-      return items.map((item) => `processed-${item}`);
-    });
+    mockProcessFn = jest.fn(async (items: string[]) =>
+      items.map((item) => `processed-${item}`),
+    );
 
-    processor = new BatchProcessor(mockProcessFn, {
+    processor = new BatchProcessor(mockProcessFn as any, {
       maxBatchSize: 10,
       maxWaitTime: 100,
       maxConcurrency: 2,
@@ -44,7 +46,7 @@ describe('BatchProcessor', () => {
 
   describe('Initialization', () => {
     it('should create a batch processor with default config', () => {
-      const defaultProcessor = new BatchProcessor(mockProcessFn);
+      const defaultProcessor = new BatchProcessor(mockProcessFn as any);
       expect(defaultProcessor).toBeDefined();
       defaultProcessor.destroy();
     });
@@ -101,7 +103,7 @@ describe('BatchProcessor', () => {
 
     it('should process immediately when batch is full', async () => {
       // Create processor with small batch size
-      const smallBatchProcessor = new BatchProcessor(mockProcessFn, {
+      const smallBatchProcessor = new BatchProcessor(mockProcessFn as any, {
         maxBatchSize: 2,
         maxWaitTime: 10000, // Long wait time
       });
@@ -121,12 +123,12 @@ describe('BatchProcessor', () => {
   describe('Priority handling', () => {
     it('should process higher priority items first', async () => {
       const processedOrder: string[] = [];
-      const orderTrackingFn = jest.fn().mockImplementation(async (items: string[]) => {
+      const orderTrackingFn = jest.fn(async (items: string[]) => {
         items.forEach((item) => processedOrder.push(item));
         return items.map((item) => `processed-${item}`);
       });
 
-      const priorityProcessor = new BatchProcessor(orderTrackingFn, {
+      const priorityProcessor = new BatchProcessor(orderTrackingFn as any, {
         maxBatchSize: 1,
         maxWaitTime: 50,
         enablePrioritization: true,
@@ -212,7 +214,7 @@ describe('BatchProcessor', () => {
     });
 
     it('should clear queue', () => {
-      processor.clear();
+      processor.clearQueue();
       expect(processor.getQueueSize()).toBe(0);
     });
   });
@@ -254,7 +256,7 @@ describe('BatchProcessor', () => {
 
   describe('Cleanup', () => {
     it('should cleanup resources on destroy', () => {
-      const testProcessor = new BatchProcessor(mockProcessFn);
+      const testProcessor = new BatchProcessor(mockProcessFn as any);
 
       // Should not throw
       expect(() => testProcessor.destroy()).not.toThrow();
